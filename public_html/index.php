@@ -74,7 +74,8 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
 <meta name="theme-color" content="#0d0d0f">
 <title>Megabrain</title>
 <link rel="icon" href="<?= e($icone) ?>?v=<?= e($versao) ?>">
-<link rel="apple-touch-icon" href="<?= e($icone) ?>?v=<?= e($versao) ?>">
+<?php /* Sem apple-touch-icon de propósito: ele exige PNG de 180px ou mais, e um
+         sprite de 16x16 apareceria borrado na tela de início do iPhone. */ ?>
 <link rel="manifest" href="manifest.json?v=<?= e($versao) ?>">
 <link rel="stylesheet" href="assets/app.css?v=<?= e($versao) ?>">
 </head>
