@@ -14,7 +14,11 @@ $acao = (string) ($_GET['a'] ?? '');
 
 // Toda mutação exige o token da sessão num header próprio. Não basta o cookie:
 // SameSite=Lax sozinho não cobre tudo, e header custom não viaja em form cross-site.
-$mutacoes = ['materia.salvar', 'materia.excluir', 'nota.salvar', 'nota.excluir', 'arquivo.enviar'];
+$mutacoes = [
+    'materia.salvar', 'materia.excluir', 'nota.salvar', 'nota.excluir', 'arquivo.enviar',
+    'rotina.salvar', 'rotina.excluir', 'rotina.excecao',
+    'compromisso.salvar', 'compromisso.excluir',
+];
 if (in_array($acao, $mutacoes, true)) {
     $enviado = $_SERVER['HTTP_X_CSRF'] ?? '';
     if (!is_string($enviado) || !hash_equals(csrf(), $enviado)) {
@@ -191,6 +195,166 @@ switch ($acao) {
 
         // no break
 
+    case 'agenda':
+        require_once __DIR__ . '/app/agenda.php';
+
+        $hoje = gmdate('Y-m-d');
+        $de   = texto($_GET, 'de', 10) ?: $hoje;
+        $ate  = texto($_GET, 'ate', 10) ?: $de;
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $de) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $ate)) {
+            json_saida(['erro' => 'data_invalida'], 422);
+        }
+
+        json_saida([
+            'de'       => $de,
+            'ate'      => $ate,
+            'dias'     => agenda_entre($b, $de, $ate),
+            'materias' => array_values($b['materias']),
+            'rotinas'  => array_values($b['rotinas']),
+        ]);
+
+        // no break
+
+    case 'rotina.salvar':
+        $d  = corpo();
+        $id = texto($d, 'id', 24);
+
+        $titulo = texto($d, 'titulo', 120);
+        if ($titulo === '') {
+            json_saida(['erro' => 'titulo_vazio'], 422);
+        }
+
+        $registro = [
+            'titulo'      => $titulo,
+            'tipo'        => in_array($d['tipo'] ?? '', ['academica', 'pessoal'], true) ? $d['tipo'] : 'pessoal',
+            'dias_semana' => max(0, min(127, (int) ($d['dias_semana'] ?? 0))),
+            'hora_inicio' => texto($d, 'hora_inicio', 5) ?: null,
+            'hora_fim'    => texto($d, 'hora_fim', 5) ?: null,
+            'local'       => texto($d, 'local', 120) ?: null,
+            'materia_id'  => texto($d, 'materia_id', 24) ?: null,
+            'inicio'      => texto($d, 'inicio', 10) ?: null,
+            'fim'         => texto($d, 'fim', 10) ?: null,
+        ];
+
+        if ($registro['dias_semana'] === 0) {
+            json_saida(['erro' => 'sem_dias'], 422);
+        }
+
+        $achou = false;
+        foreach ($b['rotinas'] as $i => $r) {
+            if (($r['id'] ?? '') === $id && $id !== '') {
+                $b['rotinas'][$i] = array_merge($r, $registro);
+                $achou = true;
+            }
+        }
+
+        if (!$achou) {
+            $id = novo_id();
+            $b['rotinas'][] = array_merge(['id' => $id, 'criado_em' => agora()], $registro);
+        }
+
+        json_saida(salvar_base($b) ? ['ok' => true, 'id' => $id] : ['erro' => 'escrita']);
+
+        // no break
+
+    case 'rotina.excluir':
+        $id = texto(corpo(), 'id', 24);
+
+        $b['rotinas'] = array_values(array_filter(
+            $b['rotinas'],
+            static fn ($r) => ($r['id'] ?? '') !== $id
+        ));
+        // Excecao orfa nao serve para nada e so cresceria para sempre.
+        $b['rotina_excecoes'] = array_values(array_filter(
+            $b['rotina_excecoes'],
+            static fn ($e) => ($e['rotina_id'] ?? '') !== $id
+        ));
+
+        json_saida(['ok' => salvar_base($b)]);
+
+        // no break
+
+    case 'rotina.excecao':
+        $d    = corpo();
+        $rid  = texto($d, 'rotina_id', 24);
+        $data = texto($d, 'data', 10);
+        $acao = in_array($d['acao'] ?? '', ['cancelada', 'movida'], true) ? $d['acao'] : 'cancelada';
+
+        if ($rid === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
+            json_saida(['erro' => 'parametros'], 422);
+        }
+
+        // Uma excecao por rotina e data; repetir substitui em vez de acumular.
+        $b['rotina_excecoes'] = array_values(array_filter(
+            $b['rotina_excecoes'],
+            static fn ($e) => !(($e['rotina_id'] ?? '') === $rid && ($e['data'] ?? '') === $data)
+        ));
+
+        if (empty($d['desfazer'])) {
+            $b['rotina_excecoes'][] = [
+                'rotina_id' => $rid,
+                'data'      => $data,
+                'acao'      => $acao,
+                'nova_hora' => texto($d, 'nova_hora', 5) ?: null,
+            ];
+        }
+
+        json_saida(['ok' => salvar_base($b)]);
+
+        // no break
+
+    case 'compromisso.salvar':
+        $d  = corpo();
+        $id = texto($d, 'id', 24);
+
+        $titulo = texto($d, 'titulo', 200);
+        $data   = texto($d, 'data', 10);
+
+        if ($titulo === '') {
+            json_saida(['erro' => 'titulo_vazio'], 422);
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
+            json_saida(['erro' => 'data_invalida'], 422);
+        }
+
+        $registro = [
+            'titulo'     => $titulo,
+            'data'       => $data,
+            'hora'       => texto($d, 'hora', 5) ?: null,
+            'materia_id' => texto($d, 'materia_id', 24) ?: null,
+            'concluido'  => !empty($d['concluido']),
+        ];
+
+        $achou = false;
+        foreach ($b['compromissos'] as $i => $c) {
+            if (($c['id'] ?? '') === $id && $id !== '') {
+                $b['compromissos'][$i] = array_merge($c, $registro);
+                $achou = true;
+            }
+        }
+
+        if (!$achou) {
+            $id = novo_id();
+            $b['compromissos'][] = array_merge(['id' => $id, 'criado_em' => agora()], $registro);
+        }
+
+        json_saida(salvar_base($b) ? ['ok' => true, 'id' => $id] : ['erro' => 'escrita']);
+
+        // no break
+
+    case 'compromisso.excluir':
+        $id = texto(corpo(), 'id', 24);
+
+        $b['compromissos'] = array_values(array_filter(
+            $b['compromissos'],
+            static fn ($c) => ($c['id'] ?? '') !== $id
+        ));
+
+        json_saida(['ok' => salvar_base($b)]);
+
+        // no break
+
     case 'grafo':
         $vivas = array_values(array_filter(
             $b['anotacoes'],
@@ -270,11 +434,21 @@ switch ($acao) {
             json_saida(['erro' => 'nome_vazio'], 422);
         }
 
+        // A arvore de avaliacoes so e tocada quando vem no pedido: renomear a
+        // materia pela barra lateral nao pode apagar a estrutura de notas.
+        $mexeNaRaiz = array_key_exists('raiz', $d);
+        if ($mexeNaRaiz && !is_array($d['raiz']) && $d['raiz'] !== null) {
+            json_saida(['erro' => 'raiz_invalida'], 422);
+        }
+
         $achou = false;
         foreach ($b['materias'] as $i => $m) {
             if (($m['id'] ?? '') === $id && $id !== '') {
                 $b['materias'][$i]['nome'] = $nome;
                 $b['materias'][$i]['cor']  = texto($d, 'cor', 9) ?: ($m['cor'] ?? '#8b5cf6');
+                if ($mexeNaRaiz) {
+                    $b['materias'][$i]['raiz'] = $d['raiz'];
+                }
                 $achou = true;
                 $id    = $m['id'];
             }
@@ -286,6 +460,7 @@ switch ($acao) {
                 'id'        => $id,
                 'nome'      => $nome,
                 'cor'       => texto($d, 'cor', 9) ?: '#8b5cf6',
+                'raiz'      => $mexeNaRaiz ? $d['raiz'] : null,
                 'criado_em' => agora(),
             ];
         }

@@ -716,3 +716,26 @@ aplicarModo(
 );
 
 carregar();
+
+// ---------------------------------------------------------- agenda
+
+async function abrirAgenda() {
+  await salvarJa();
+  try {
+    await Agenda.abrir({ api: api });
+  } catch (e) {
+    marcar('falhou', 'sem conexão');
+  }
+}
+
+document.getElementById('abrir-agenda').addEventListener('click', abrirAgenda);
+document.getElementById('fechar-agenda').addEventListener('click', () => Agenda.fechar());
+document.getElementById('ag-anterior').addEventListener('click', () => Agenda.mover(-1));
+document.getElementById('ag-proximo').addEventListener('click', () => Agenda.mover(1));
+document.getElementById('ag-hoje').addEventListener('click', () => Agenda.irParaHoje());
+document.getElementById('ag-rotinas').addEventListener('click', () => Agenda.alternarRotinas());
+
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && Agenda.aberto()) Agenda.fechar();
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'j') { ev.preventDefault(); abrirAgenda(); }
+});

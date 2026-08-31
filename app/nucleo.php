@@ -333,11 +333,19 @@ function limpar_tentativas(): void
 /** Base do usuário. Um arquivo só: simples, atômico, e some fácil no backup. */
 function base(): array
 {
-    return ler_json(caminho('base.json'), [
-        'versao'    => 1,
-        'materias'  => [],
-        'anotacoes' => [],
-    ]);
+    // As colecoes sao completadas na leitura porque um base.json gravado por
+    // versao anterior nao tem as chaves novas. Sem isto, quem ja usa o app
+    // quebraria justamente ao atualizar.
+    $b = ler_json(caminho('base.json'), []);
+
+    return $b + [
+        'versao'          => 1,
+        'materias'        => [],
+        'anotacoes'       => [],
+        'rotinas'         => [],
+        'compromissos'    => [],
+        'rotina_excecoes' => [],
+    ];
 }
 
 function salvar_base(array $b): bool

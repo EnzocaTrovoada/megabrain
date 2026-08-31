@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Sobe a cada mudança em CSS/JS: o LiteSpeed cacheia estático por dias e sem
 // isto você continuaria vendo a versão velha depois do upload.
-$versao = '5';
+$versao = '6';
 
 // Ícone do site. Procura o PNG nos dois lugares onde ele costuma ser largado e
 // cai no SVG do repositório se não achar nenhum — assim reenviar o index.php
@@ -159,6 +159,7 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
         <input type="text" id="titulo" placeholder="Título da anotação" autocomplete="off">
         <select id="materia-da-nota" title="Matéria"></select>
         <button id="alternar-ler" class="icone" title="Ler / editar (Ctrl+E)">◑</button>
+        <button id="abrir-agenda" class="icone" title="Agenda (Ctrl+J)">▦</button>
         <button id="abrir-grafo" class="icone" title="Mapa mental (Ctrl+G)">◍</button>
         <span id="estado" class="estado"></span>
       </header>
@@ -176,6 +177,25 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
         <p class="dica">Crie uma no <strong>+</strong> ao lado de “Anotações”.</p>
       </div>
     </main>
+  </div>
+
+  <div id="agenda" class="agenda oculto">
+    <div class="agenda-barra">
+      <strong>Agenda</strong>
+      <button id="ag-anterior" title="Mês anterior">‹</button>
+      <span id="agenda-mes"></span>
+      <button id="ag-proximo" title="Próximo mês">›</button>
+      <button id="ag-hoje">hoje</button>
+      <button id="ag-rotinas">rotinas</button>
+      <button id="fechar-agenda" title="Fechar">×</button>
+    </div>
+    <div class="agenda-corpo">
+      <div class="agenda-mes-caixa">
+        <div id="agenda-grade" class="agenda-grade"></div>
+        <div id="agenda-rotinas" class="agenda-rotinas oculto"></div>
+      </div>
+      <section id="agenda-dia" class="agenda-dia"></section>
+    </div>
   </div>
 
   <div id="grafo" class="grafo oculto">
@@ -198,6 +218,7 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
 
   <script type="application/json" id="bootstrap"><?= json_encode(['csrf' => csrf()], JSON_UNESCAPED_UNICODE) ?></script>
   <script src="assets/markdown.js?v=<?= e($versao) ?>"></script>
+  <script src="assets/agenda.js?v=<?= e($versao) ?>"></script>
   <script src="assets/grafo.js?v=<?= e($versao) ?>"></script>
   <script src="assets/app.js?v=<?= e($versao) ?>"></script>
 

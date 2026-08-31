@@ -1,0 +1,472 @@
+'use strict';
+
+/**
+ * Agenda: mês para navegar, dia para usar.
+ *
+ * O mês inteiro vem numa requisição só e o clique num dia só troca o painel da
+ * direita — trocar de dia não pode custar ida ao servidor.
+ *
+ * Datas andam como texto 'YYYY-MM-DD' de ponta a ponta. Passar por Date e
+ * voltar é onde nasce o bug clássico de o dia aparecer deslocado por fuso.
+ */
+window.Agenda = (function () {
+
+  const SEMANA = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+  let api = null, aoAbrirMateria = null;
+  let mes = null;            // 'YYYY-MM'
+  let selecionada = null;    // 'YYYY-MM-DD'
+  let dias = {};
+  let materias = [];
+  let rotinas = [];
+
+  // ------------------------------------------------------------- datas
+
+  function hoje() {
+    const d = new Date();
+    return iso(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  }
+
+  function iso(a, m, d) {
+    return a + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+
+  function partes(data) {
+    const [a, m, d] = data.split('-').map(Number);
+    return { a: a, m: m, d: d };
+  }
+
+  /** Segunda = 0. getDay() dá domingo = 0, que não é como se lê um calendário. */
+  function diaDaSemana(data) {
+    const p = partes(data);
+    return (new Date(p.a, p.m - 1, p.d).getDay() + 6) % 7;
+  }
+
+  function diasNoMes(a, m) {
+    return new Date(a, m, 0).getDate();
+  }
+
+  function porExtenso(data) {
+    const p = partes(data);
+    return p.d + ' de ' + MESES[p.m - 1] + ' de ' + p.a;
+  }
+
+  // ------------------------------------------------------------ dados
+
+  async function carregarMes(novoMes) {
+    mes = novoMes;
+    const [a, m] = mes.split('-').map(Number);
+
+    const r = await api('agenda', null, { de: iso(a, m, 1), ate: iso(a, m, diasNoMes(a, m)) });
+    dias = r.dias || {};
+    materias = r.materias || [];
+    rotinas = r.rotinas || [];
+
+    desenharMes();
+    if (selecionada && selecionada.slice(0, 7) === mes) desenharDia();
+  }
+
+  function corDaMateria(id) {
+    const m = materias.find((x) => x.id === id);
+    return m ? (m.cor || '#8b5cf6') : null;
+  }
+
+  function nomeDaMateria(id) {
+    const m = materias.find((x) => x.id === id);
+    return m ? m.nome : null;
+  }
+
+  // ------------------------------------------------------------- mês
+
+  function desenharMes() {
+    const [a, m] = mes.split('-').map(Number);
+    document.getElementById('agenda-mes').textContent = MESES[m - 1] + ' de ' + a;
+
+    const grade = document.getElementById('agenda-grade');
+    grade.textContent = '';
+
+    SEMANA.forEach((s) => {
+      const c = document.createElement('div');
+      c.className = 'ag-cabeca';
+      c.textContent = s;
+      grade.appendChild(c);
+    });
+
+    // Espaços até o primeiro dia cair na coluna certa.
+    const primeiro = diaDaSemana(iso(a, m, 1));
+    for (let i = 0; i < primeiro; i++) {
+      grade.appendChild(document.createElement('div'));
+    }
+
+    for (let d = 1; d <= diasNoMes(a, m); d++) {
+      const data = iso(a, m, d);
+      const info = dias[data] || { itens: [], feriados: null };
+
+      const cel = document.createElement('button');
+      cel.className = 'ag-dia';
+      cel.type = 'button';
+      if (data === hoje()) cel.classList.add('hoje');
+      if (data === selecionada) cel.classList.add('sel');
+      if (info.feriados) cel.classList.add('feriado');
+
+      const n = document.createElement('span');
+      n.className = 'ag-num';
+      n.textContent = String(d);
+      cel.appendChild(n);
+
+      if (info.feriados) {
+        cel.title = info.feriados.map((f) => f.nome).join(' · ');
+      }
+
+      const pontos = document.createElement('span');
+      pontos.className = 'ag-pontos';
+      // No máximo quatro pontos: além disso vira sujeira e não informa mais.
+      info.itens.slice(0, 4).forEach((it) => {
+        const p = document.createElement('i');
+        if (it.origem === 'avaliacao') p.className = 'prova';
+        else if (it.origem === 'compromisso') p.className = it.concluido ? 'feito' : 'tarefa';
+        const cor = corDaMateria(it.materia_id);
+        if (cor && it.origem !== 'avaliacao') p.style.background = cor;
+        pontos.appendChild(p);
+      });
+      cel.appendChild(pontos);
+
+      cel.addEventListener('click', () => { selecionada = data; desenharMes(); desenharDia(); });
+      grade.appendChild(cel);
+    }
+  }
+
+  // -------------------------------------------------------------- dia
+
+  function desenharDia() {
+    const painel = document.getElementById('agenda-dia');
+    painel.textContent = '';
+
+    if (!selecionada) return;
+    const info = dias[selecionada] || { itens: [], feriados: null };
+
+    const cab = document.createElement('header');
+    const h = document.createElement('h3');
+    h.textContent = porExtenso(selecionada);
+    cab.appendChild(h);
+
+    const sub = document.createElement('span');
+    sub.className = 'ag-subtitulo';
+    const i = diaDaSemana(selecionada);
+    sub.textContent = ['segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira',
+                       'sexta-feira', 'sábado', 'domingo'][i];
+    cab.appendChild(sub);
+    painel.appendChild(cab);
+
+    if (info.feriados) {
+      const av = document.createElement('div');
+      av.className = 'ag-feriado';
+      av.textContent = info.feriados.map((f) => f.nome).join(' · ') + ' — sem aula';
+      painel.appendChild(av);
+    }
+
+    const lista = document.createElement('ul');
+    lista.className = 'ag-itens';
+
+    if (info.itens.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'ag-vazio';
+      li.textContent = 'Nada marcado.';
+      lista.appendChild(li);
+    }
+
+    info.itens.forEach((it) => lista.appendChild(linhaItem(it)));
+    painel.appendChild(lista);
+
+    painel.appendChild(formularioCompromisso());
+  }
+
+  function linhaItem(it) {
+    const li = document.createElement('li');
+    li.className = 'ag-item ' + it.origem;
+
+    const hora = document.createElement('span');
+    hora.className = 'ag-hora';
+    hora.textContent = it.hora || '—';
+    li.appendChild(hora);
+
+    const meio = document.createElement('div');
+    meio.className = 'ag-meio';
+
+    const t = document.createElement('span');
+    t.className = 'ag-titulo';
+    t.textContent = it.titulo;
+    if (it.concluido) t.classList.add('feito');
+    meio.appendChild(t);
+
+    const detalhes = [];
+    if (it.origem === 'avaliacao') {
+      detalhes.push(it.lancada ? 'nota já lançada' : 'vale ' + it.peso_media + '% da média');
+    }
+    if (it.local) detalhes.push(it.local);
+    if (it.hora_fim) detalhes.push('até ' + it.hora_fim);
+    const nomeMat = nomeDaMateria(it.materia_id);
+    if (nomeMat) detalhes.push(nomeMat);
+
+    if (detalhes.length) {
+      const d = document.createElement('span');
+      d.className = 'ag-detalhe';
+      d.textContent = detalhes.join(' · ');
+      meio.appendChild(d);
+    }
+    li.appendChild(meio);
+
+    const cor = corDaMateria(it.materia_id);
+    if (cor) li.style.borderLeftColor = cor;
+
+    if (it.origem === 'compromisso') {
+      li.appendChild(botao(it.concluido ? '↺' : '✓', it.concluido ? 'Desmarcar' : 'Concluir', async () => {
+        await api('compromisso.salvar', {
+          id: it.ref, titulo: it.titulo, data: selecionada,
+          hora: it.hora, materia_id: it.materia_id, concluido: !it.concluido,
+        });
+        await carregarMes(mes);
+      }));
+      li.appendChild(botao('×', 'Excluir', async () => {
+        await api('compromisso.excluir', { id: it.ref });
+        await carregarMes(mes);
+      }));
+    }
+
+    if (it.origem === 'rotina') {
+      li.appendChild(botao('×', 'Cancelar só neste dia', async () => {
+        await api('rotina.excecao', { rotina_id: it.ref, data: selecionada, acao: 'cancelada' });
+        await carregarMes(mes);
+      }));
+    }
+
+    return li;
+  }
+
+  function botao(rotulo, titulo, aoClicar) {
+    const b = document.createElement('button');
+    b.className = 'ag-acao';
+    b.type = 'button';
+    b.textContent = rotulo;
+    b.title = titulo;
+    b.addEventListener('click', aoClicar);
+    return b;
+  }
+
+  function formularioCompromisso() {
+    const f = document.createElement('form');
+    f.className = 'ag-novo';
+
+    const txt = document.createElement('input');
+    txt.type = 'text';
+    txt.placeholder = 'Adicionar ao dia…';
+    txt.required = true;
+
+    const hora = document.createElement('input');
+    hora.type = 'time';
+    hora.title = 'Hora (opcional)';
+
+    const ok = document.createElement('button');
+    ok.type = 'submit';
+    ok.textContent = '+';
+
+    f.append(txt, hora, ok);
+
+    f.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      if (!txt.value.trim()) return;
+      await api('compromisso.salvar', {
+        titulo: txt.value.trim(),
+        data: selecionada,
+        hora: hora.value || null,
+      });
+      txt.value = '';
+      await carregarMes(mes);
+    });
+
+    return f;
+  }
+
+  // ---------------------------------------------------------- rotinas
+
+  async function abrirRotinas() {
+    const cx = document.getElementById('agenda-rotinas');
+    cx.classList.toggle('oculto');
+    if (cx.classList.contains('oculto')) return;
+
+    const r = await api('agenda', null, { de: hoje(), ate: hoje() });
+    materias = r.materias || [];
+    desenharRotinas();
+  }
+
+  function desenharRotinas() {
+    const cx = document.getElementById('agenda-rotinas');
+    cx.textContent = '';
+
+    const h = document.createElement('h3');
+    h.textContent = 'Rotinas';
+    cx.appendChild(h);
+
+    const p = document.createElement('p');
+    p.className = 'ag-subtitulo';
+    p.textContent = 'Aula some em feriado. Rotina pessoal continua aparecendo.';
+    cx.appendChild(p);
+
+    const lista = document.createElement('ul');
+    lista.className = 'ag-rotinas';
+
+    rotinas.forEach((r) => {
+      const li = document.createElement('li');
+
+      const nome = document.createElement('span');
+      nome.className = 'ag-titulo';
+      nome.textContent = r.titulo;
+      li.appendChild(nome);
+
+      const det = document.createElement('span');
+      det.className = 'ag-detalhe';
+      det.textContent = diasLegiveis(r.dias_semana)
+        + (r.hora_inicio ? ' · ' + r.hora_inicio : '')
+        + ' · ' + (r.tipo === 'academica' ? 'aula' : 'pessoal');
+      li.appendChild(det);
+
+      li.appendChild(botao('×', 'Excluir rotina', async () => {
+        if (!confirm('Excluir a rotina "' + r.titulo + '"?')) return;
+        await api('rotina.excluir', { id: r.id });
+        rotinas = rotinas.filter((x) => x.id !== r.id);
+        desenharRotinas();
+        await carregarMes(mes);
+      }));
+
+      lista.appendChild(li);
+    });
+
+    cx.appendChild(lista);
+    cx.appendChild(formularioRotina());
+  }
+
+  function diasLegiveis(mascara) {
+    return SEMANA.filter((_, i) => mascara & (1 << i)).join(' ') || '—';
+  }
+
+  function formularioRotina() {
+    const f = document.createElement('form');
+    f.className = 'ag-nova-rotina';
+
+    const nome = document.createElement('input');
+    nome.type = 'text';
+    nome.placeholder = 'Nome (ex.: Academia)';
+    nome.required = true;
+
+    const caixaDias = document.createElement('div');
+    caixaDias.className = 'ag-dias';
+    const marcados = [];
+    SEMANA.forEach((s, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = s;
+      b.addEventListener('click', () => {
+        b.classList.toggle('on');
+        const bit = 1 << i;
+        const p = marcados.indexOf(bit);
+        if (p === -1) marcados.push(bit); else marcados.splice(p, 1);
+      });
+      caixaDias.appendChild(b);
+    });
+
+    const hora = document.createElement('input');
+    hora.type = 'time';
+
+    const tipo = document.createElement('select');
+    [['pessoal', 'pessoal'], ['academica', 'aula']].forEach(([v, r]) => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = r;
+      tipo.appendChild(o);
+    });
+
+    const mat = document.createElement('select');
+    const vazio = document.createElement('option');
+    vazio.value = '';
+    vazio.textContent = 'sem matéria';
+    mat.appendChild(vazio);
+    materias.forEach((m) => {
+      const o = document.createElement('option');
+      o.value = m.id;
+      o.textContent = m.nome;
+      mat.appendChild(o);
+    });
+
+    const ok = document.createElement('button');
+    ok.type = 'submit';
+    ok.textContent = 'Criar rotina';
+
+    f.append(nome, caixaDias, hora, tipo, mat, ok);
+
+    f.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const mascara = marcados.reduce((a, b) => a + b, 0);
+      if (!mascara) { alert('Escolha pelo menos um dia da semana.'); return; }
+
+      const r = await api('rotina.salvar', {
+        titulo: nome.value.trim(),
+        tipo: tipo.value,
+        dias_semana: mascara,
+        hora_inicio: hora.value || null,
+        materia_id: mat.value || null,
+      });
+
+      rotinas.push({
+        id: r.id, titulo: nome.value.trim(), tipo: tipo.value,
+        dias_semana: mascara, hora_inicio: hora.value || null, materia_id: mat.value || null,
+      });
+
+      desenharRotinas();
+      await carregarMes(mes);
+    });
+
+    return f;
+  }
+
+  // ------------------------------------------------------------ público
+
+  return {
+    async abrir(opcoes) {
+      api = opcoes.api;
+      aoAbrirMateria = opcoes.aoAbrirMateria || null;
+      rotinas = opcoes.rotinas || rotinas;
+
+      document.getElementById('agenda').classList.remove('oculto');
+
+      selecionada = selecionada || hoje();
+      await carregarMes(selecionada.slice(0, 7));
+      desenharDia();
+    },
+
+    fechar() {
+      document.getElementById('agenda').classList.add('oculto');
+      document.getElementById('agenda-rotinas').classList.add('oculto');
+    },
+
+    aberto() {
+      return !document.getElementById('agenda').classList.contains('oculto');
+    },
+
+    async mover(passo) {
+      const [a, m] = mes.split('-').map(Number);
+      const d = new Date(a, m - 1 + passo, 1);
+      await carregarMes(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+    },
+
+    async irParaHoje() {
+      selecionada = hoje();
+      await carregarMes(selecionada.slice(0, 7));
+      desenharDia();
+    },
+
+    alternarRotinas: abrirRotinas,
+    definirRotinas(lista) { rotinas = lista || []; },
+  };
+})();
