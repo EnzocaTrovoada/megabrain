@@ -1,0 +1,42 @@
+# Megabrain — configuração do LiteSpeed/Apache na Hostinger.
+# Conservador de propósito: tudo em IfModule para não derrubar o site com 500
+# caso algum módulo não esteja disponível.
+
+Options -Indexes
+
+DirectoryIndex index.php index.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "same-origin"
+  Header always set X-Frame-Options "DENY"
+  Header always set Strict-Transport-Security "max-age=31536000"
+</IfModule>
+
+# Código-fonte, dados e ferramentas de teste não são servidos. O núcleo da
+# aplicação é lido pelo PHP a partir do disco; ninguém precisa alcançar por URL.
+RedirectMatch 404 ^/(app|dados|src|testes|bin)(/|$)
+
+# Nem sobras de escrita atômica, nem markdown do repositório.
+<FilesMatch "\.(tmp|json|md|log)$">
+  Require all denied
+</FilesMatch>
+
+# manifest.json é a exceção: o navegador precisa dele.
+<Files "manifest.json">
+  Require all granted
+</Files>
+
+# O LiteSpeed cacheia estático por dias. Os arquivos já vão versionados com ?v=,
+# mas encurtamos para o cache não segurar uma versão quebrada por uma semana.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 hour"
+  ExpiresByType application/javascript "access plus 1 hour"
+</IfModule>
