@@ -62,7 +62,7 @@ window.Grafo = (function () {
 
       const no = Object.assign({}, n, {
         grau: g,
-        r: n.tipo === 'materia' ? 9 + Math.sqrt(g) * 2.4 : 4.5 + Math.sqrt(g) * 2.2,
+        r: n.tipo === 'espaco' ? 9 + Math.sqrt(g) * 2.4 : 4.5 + Math.sqrt(g) * 2.2,
         x: velho ? velho.x : Math.cos(ang) * (120 + Math.random() * 90),
         y: velho ? velho.y : Math.sin(ang) * (120 + Math.random() * 90),
         vx: 0, vy: 0,
@@ -131,10 +131,10 @@ window.Grafo = (function () {
   // ------------------------------------------------------------- desenho
 
   function corDoNo(n) {
-    if (n.tipo === 'materia') return n.cor || '#8b5cf6';
+    if (n.tipo === 'espaco') return n.cor || '#8b5cf6';
     if (n.tipo === 'fantasma') return '#4a4a56';
-    if (n.materia) {
-      const m = porId.get('m:' + n.materia);
+    if (n.espaco) {
+      const m = porId.get('e:' + n.espaco);
       if (m) return m.cor || '#8b5cf6';
     }
     return '#7d7d8c';
@@ -160,7 +160,7 @@ window.Grafo = (function () {
       ctx.lineTo(e.para.x, e.para.y);
       const aceso = sobre && (e.de === sobre || e.para === sobre);
       ctx.strokeStyle = aceso ? 'rgba(139,92,246,.85)' : 'rgba(255,255,255,.11)';
-      ctx.lineWidth = (aceso ? 1.6 : e.tipo === 'materia' ? 1.1 : 0.8) / camera.z;
+      ctx.lineWidth = (aceso ? 1.6 : e.tipo === 'espaco' ? 1.1 : 0.8) / camera.z;
       ctx.stroke();
     });
 
@@ -187,10 +187,10 @@ window.Grafo = (function () {
       }
 
       // Rótulo só quando cabe: em zoom baixo vira sopa de letras ilegível.
-      const mostrar = n === sobre || n.tipo === 'materia' || camera.z > 0.85 || n.grau >= 4;
+      const mostrar = n === sobre || n.tipo === 'espaco' || camera.z > 0.85 || n.grau >= 4;
       if (mostrar) {
         const t = 11 / camera.z;
-        ctx.font = (n.tipo === 'materia' ? '600 ' : '') + t + 'px system-ui, sans-serif';
+        ctx.font = (n.tipo === 'espaco' ? '600 ' : '') + t + 'px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillStyle = n === sobre ? '#fff' : 'rgba(230,230,234,.72)';
         const rotulo = n.rotulo.length > 28 ? n.rotulo.slice(0, 27) + '…' : n.rotulo;

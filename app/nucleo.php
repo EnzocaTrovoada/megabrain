@@ -331,6 +331,49 @@ function limpar_tentativas(): void
 // ------------------------------------------------------------------- base
 
 /** Base do usuário. Um arquivo só: simples, atômico, e some fácil no backup. */
+/**
+ * Migra a base para o modelo de espacos.
+ *
+ * "Materia" era o unico agrupamento, o que amarrava o sistema a aula. Agora o
+ * container e generico e o TIPO e que muda comportamento: so disciplina tem
+ * arvore de notas e media; so rotina marcada pula feriado.
+ *
+ * Roda uma vez e grava; nas leituras seguintes o versao 2 corta na primeira linha.
+ */
+function migrar_base(array $b): array
+{
+    if ((int) ($b['versao'] ?? 1) >= 2) {
+        return $b;
+    }
+
+    $b['espacos'] = [];
+    foreach ($b['materias'] ?? [] as $m) {
+        $m['tipo'] = $m['tipo'] ?? 'disciplina';
+        $b['espacos'][] = $m;
+    }
+    unset($b['materias']);
+
+    foreach (['anotacoes', 'rotinas', 'compromissos'] as $col) {
+        foreach ($b[$col] ?? [] as $i => $x) {
+            if (array_key_exists('materia_id', $x)) {
+                $b[$col][$i]['espaco_id'] = $x['materia_id'];
+                unset($b[$col][$i]['materia_id']);
+            }
+        }
+    }
+
+    // "academica" virou uma pergunta direta: esta rotina para em feriado?
+    // Um projeto de trabalho tambem para; um habito pessoal, nao.
+    foreach ($b['rotinas'] ?? [] as $i => $r) {
+        $b['rotinas'][$i]['pula_feriado'] = (($r['tipo'] ?? 'pessoal') === 'academica');
+        unset($b['rotinas'][$i]['tipo']);
+    }
+
+    $b['versao'] = 2;
+
+    return $b;
+}
+
 function base(): array
 {
     // As colecoes sao completadas na leitura porque um base.json gravado por
@@ -338,9 +381,15 @@ function base(): array
     // quebraria justamente ao atualizar.
     $b = ler_json(caminho('base.json'), []);
 
+    $antes = $b['versao'] ?? 1;
+    $b     = migrar_base($b);
+    if ($antes !== ($b['versao'] ?? 1)) {
+        escrever_json(caminho('base.json'), $b);
+    }
+
     return $b + [
-        'versao'          => 1,
-        'materias'        => [],
+        'versao'          => 2,
+        'espacos'         => [],
         'anotacoes'       => [],
         'rotinas'         => [],
         'compromissos'    => [],
@@ -350,7 +399,7 @@ function base(): array
 
 function salvar_base(array $b): bool
 {
-    $b['versao'] = 1;
+    $b['versao'] = 2;
 
     return escrever_json(caminho('base.json'), $b);
 }

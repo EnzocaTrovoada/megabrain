@@ -15,7 +15,7 @@ $acao = (string) ($_GET['a'] ?? '');
 // Toda mutação exige o token da sessão num header próprio. Não basta o cookie:
 // SameSite=Lax sozinho não cobre tudo, e header custom não viaja em form cross-site.
 $mutacoes = [
-    'materia.salvar', 'materia.excluir', 'nota.salvar', 'nota.excluir', 'arquivo.enviar',
+    'espaco.salvar', 'espaco.excluir', 'nota.salvar', 'nota.excluir', 'arquivo.enviar',
     'rotina.salvar', 'rotina.excluir', 'rotina.excecao',
     'compromisso.salvar', 'compromisso.excluir',
     'feed.criar', 'feed.revogar',
@@ -59,7 +59,7 @@ switch ($acao) {
 
     case 'estado':
         json_saida([
-            'materias'  => array_values($b['materias']),
+            'espacos'   => array_values($b['espacos']),
             'anotacoes' => array_values(array_map(
                 // A lista não precisa do corpo das notas; só o editor precisa.
                 static fn (array $n): array => array_diff_key($n, ['conteudo' => 1]) + [
@@ -212,7 +212,7 @@ switch ($acao) {
             'de'       => $de,
             'ate'      => $ate,
             'dias'     => agenda_entre($b, $de, $ate),
-            'materias' => array_values($b['materias']),
+            'espacos'  => array_values($b['espacos']),
             'rotinas'  => array_values($b['rotinas']),
         ]);
 
@@ -229,12 +229,12 @@ switch ($acao) {
 
         $registro = [
             'titulo'      => $titulo,
-            'tipo'        => in_array($d['tipo'] ?? '', ['academica', 'pessoal'], true) ? $d['tipo'] : 'pessoal',
+            'pula_feriado' => !empty($d['pula_feriado']),
             'dias_semana' => max(0, min(127, (int) ($d['dias_semana'] ?? 0))),
             'hora_inicio' => texto($d, 'hora_inicio', 5) ?: null,
             'hora_fim'    => texto($d, 'hora_fim', 5) ?: null,
             'local'       => texto($d, 'local', 120) ?: null,
-            'materia_id'  => texto($d, 'materia_id', 24) ?: null,
+            'espaco_id'   => texto($d, 'espaco_id', 24) ?: null,
             'inicio'      => texto($d, 'inicio', 10) ?: null,
             'fim'         => texto($d, 'fim', 10) ?: null,
         ];
@@ -330,7 +330,7 @@ switch ($acao) {
             'dia_inteiro' => $diaInteiro,
             'hora'        => $diaInteiro ? null : (texto($d, 'hora', 5) ?: null),
             'hora_fim'    => $diaInteiro ? null : (texto($d, 'hora_fim', 5) ?: null),
-            'materia_id'  => texto($d, 'materia_id', 24) ?: null,
+            'espaco_id'   => texto($d, 'espaco_id', 24) ?: null,
             'concluido'   => !empty($d['concluido']),
         ];
 
@@ -440,7 +440,7 @@ switch ($acao) {
 
         json_saida([
             'pendencias' => pendencias($b),
-            'materias'   => array_values($b['materias']),
+            'espacos'    => array_values($b['espacos']),
         ]);
 
         // no break
@@ -502,11 +502,11 @@ switch ($acao) {
         // Matéria é nó de primeira classe. No Obsidian o grafo nasce vazio até
         // você linkar tudo à mão; aqui matéria->nota já é uma ligação real, então
         // o mapa nasce com estrutura em vez de uma nuvem de pontos soltos.
-        foreach ($b['materias'] as $m) {
+        foreach ($b['espacos'] as $m) {
             $nos[] = [
-                'id'     => 'm:' . $m['id'],
+                'id'     => 'e:' . $m['id'],
                 'rotulo' => $m['nome'],
-                'tipo'   => 'materia',
+                'tipo'   => 'espaco',
                 'cor'    => $m['cor'] ?? '#8b5cf6',
                 'ref'    => $m['id'],
             ];
@@ -517,12 +517,12 @@ switch ($acao) {
                 'id'      => 'n:' . $n['id'],
                 'rotulo'  => ($n['titulo'] ?? '') !== '' ? $n['titulo'] : 'Sem título',
                 'tipo'    => 'nota',
-                'materia' => $n['materia_id'] ?? null,
+                'espaco' => $n['espaco_id'] ?? null,
                 'ref'     => $n['id'],
             ];
 
-            if (!empty($n['materia_id'])) {
-                $arestas[] = ['de' => 'm:' . $n['materia_id'], 'para' => 'n:' . $n['id'], 'tipo' => 'materia'];
+            if (!empty($n['espaco_id'])) {
+                $arestas[] = ['de' => 'e:' . $n['espaco_id'], 'para' => 'n:' . $n['id'], 'tipo' => 'espaco'];
             }
 
             foreach (extrair_links((string) ($n['conteudo'] ?? '')) as $bruto) {
@@ -550,7 +550,7 @@ switch ($acao) {
 
         // no break
 
-    case 'materia.salvar':
+    case 'espaco.salvar':
         $d    = corpo();
         $id   = texto($d, 'id', 24);
         $nome = texto($d, 'nome', 120);
@@ -560,19 +560,28 @@ switch ($acao) {
         }
 
         // A arvore de avaliacoes so e tocada quando vem no pedido: renomear a
-        // materia pela barra lateral nao pode apagar a estrutura de notas.
+        // espaco pela barra lateral nao pode apagar a estrutura de notas.
         $mexeNaRaiz = array_key_exists('raiz', $d);
         if ($mexeNaRaiz && !is_array($d['raiz']) && $d['raiz'] !== null) {
             json_saida(['erro' => 'raiz_invalida'], 422);
         }
 
+        // Disciplina, projeto ou pessoal. So disciplina tem arvore de notas e
+        // media; o resto e agrupamento puro.
+        $tipoEspaco = in_array($d['tipo'] ?? '', ['disciplina', 'projeto', 'pessoal'], true)
+            ? $d['tipo']
+            : null;
+
         $achou = false;
-        foreach ($b['materias'] as $i => $m) {
+        foreach ($b['espacos'] as $i => $m) {
             if (($m['id'] ?? '') === $id && $id !== '') {
-                $b['materias'][$i]['nome'] = $nome;
-                $b['materias'][$i]['cor']  = texto($d, 'cor', 9) ?: ($m['cor'] ?? '#8b5cf6');
+                $b['espacos'][$i]['nome'] = $nome;
+                if ($tipoEspaco !== null) {
+                    $b['espacos'][$i]['tipo'] = $tipoEspaco;
+                }
+                $b['espacos'][$i]['cor']  = texto($d, 'cor', 9) ?: ($m['cor'] ?? '#8b5cf6');
                 if ($mexeNaRaiz) {
-                    $b['materias'][$i]['raiz'] = $d['raiz'];
+                    $b['espacos'][$i]['raiz'] = $d['raiz'];
                 }
                 $achou = true;
                 $id    = $m['id'];
@@ -581,9 +590,10 @@ switch ($acao) {
 
         if (!$achou) {
             $id = novo_id();
-            $b['materias'][] = [
+            $b['espacos'][] = [
                 'id'        => $id,
                 'nome'      => $nome,
+                'tipo'      => $tipoEspaco ?? 'projeto',
                 'cor'       => texto($d, 'cor', 9) ?: '#8b5cf6',
                 'raiz'      => $mexeNaRaiz ? $d['raiz'] : null,
                 'criado_em' => agora(),
@@ -597,17 +607,17 @@ switch ($acao) {
 
         // no break
 
-    case 'materia.excluir':
+    case 'espaco.excluir':
         $id = texto(corpo(), 'id', 24);
 
-        $b['materias'] = array_values(array_filter(
-            $b['materias'],
+        $b['espacos'] = array_values(array_filter(
+            $b['espacos'],
             static fn ($m) => ($m['id'] ?? '') !== $id
         ));
         // Anotação órfã continua existindo: perder matéria não pode perder texto.
         foreach ($b['anotacoes'] as $i => $n) {
-            if (($n['materia_id'] ?? null) === $id) {
-                $b['anotacoes'][$i]['materia_id'] = null;
+            if (($n['espaco_id'] ?? null) === $id) {
+                $b['anotacoes'][$i]['espaco_id'] = null;
             }
         }
 
@@ -624,14 +634,14 @@ switch ($acao) {
         if (mb_strlen($conteudo) > 400000) {
             json_saida(['erro' => 'grande_demais'], 413);
         }
-        $materia = texto($d, 'materia_id', 24) ?: null;
+        $espaco = texto($d, 'espaco_id', 24) ?: null;
 
         $achou = false;
         foreach ($b['anotacoes'] as $i => $n) {
             if (($n['id'] ?? '') === $id && $id !== '') {
                 $b['anotacoes'][$i]['titulo']        = $titulo;
                 $b['anotacoes'][$i]['conteudo']      = $conteudo;
-                $b['anotacoes'][$i]['materia_id']    = $materia;
+                $b['anotacoes'][$i]['espaco_id']     = $espaco;
                 $b['anotacoes'][$i]['atualizado_em'] = agora();
                 $achou = true;
             }
@@ -643,7 +653,7 @@ switch ($acao) {
                 'id'            => $id,
                 'titulo'        => $titulo,
                 'conteudo'      => $conteudo,
-                'materia_id'    => $materia,
+                'espaco_id'     => $espaco,
                 'criado_em'     => agora(),
                 'atualizado_em' => agora(),
                 'excluida_em'   => null,

@@ -15,11 +15,11 @@ window.Agenda = (function () {
   const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
                  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-  let api = null, aoAbrirMateria = null;
+  let api = null;
   let mes = null;            // 'YYYY-MM'
   let selecionada = null;    // 'YYYY-MM-DD'
   let dias = {};
-  let materias = [];
+  let espacos = [];
   let rotinas = [];
 
   // ------------------------------------------------------------- datas
@@ -61,20 +61,20 @@ window.Agenda = (function () {
 
     const r = await api('agenda', null, { de: iso(a, m, 1), ate: iso(a, m, diasNoMes(a, m)) });
     dias = r.dias || {};
-    materias = r.materias || [];
+    espacos = r.espacos || [];
     rotinas = r.rotinas || [];
 
     desenharMes();
     if (selecionada && selecionada.slice(0, 7) === mes) desenharDia();
   }
 
-  function corDaMateria(id) {
-    const m = materias.find((x) => x.id === id);
+  function corDoEspaco(id) {
+    const m = espacos.find((x) => x.id === id);
     return m ? (m.cor || '#8b5cf6') : null;
   }
 
-  function nomeDaMateria(id) {
-    const m = materias.find((x) => x.id === id);
+  function nomeDoEspaco(id) {
+    const m = espacos.find((x) => x.id === id);
     return m ? m.nome : null;
   }
 
@@ -127,7 +127,7 @@ window.Agenda = (function () {
         const p = document.createElement('i');
         if (it.origem === 'avaliacao') p.className = 'prova';
         else if (it.origem === 'compromisso') p.className = it.concluido ? 'feito' : 'tarefa';
-        const cor = corDaMateria(it.materia_id);
+        const cor = corDoEspaco(it.espaco_id);
         if (cor && it.origem !== 'avaliacao') p.style.background = cor;
         pontos.appendChild(p);
       });
@@ -210,8 +210,8 @@ window.Agenda = (function () {
     if (it.local) detalhes.push(it.local);
     if (it.hora_fim) detalhes.push('até ' + it.hora_fim);
     if (it.origem === 'pendencia') detalhes.push('em ' + it.nota);
-    const nomeMat = nomeDaMateria(it.materia_id);
-    if (nomeMat) detalhes.push(nomeMat);
+    const nomeEsp = nomeDoEspaco(it.espaco_id);
+    if (nomeEsp) detalhes.push(nomeEsp);
 
     if (detalhes.length) {
       const d = document.createElement('span');
@@ -221,14 +221,14 @@ window.Agenda = (function () {
     }
     li.appendChild(meio);
 
-    const cor = corDaMateria(it.materia_id);
+    const cor = corDoEspaco(it.espaco_id);
     if (cor) li.style.borderLeftColor = cor;
 
     if (it.origem === 'compromisso') {
       li.appendChild(botao(it.concluido ? '↺' : '✓', it.concluido ? 'Desmarcar' : 'Concluir', async () => {
         await api('compromisso.salvar', {
           id: it.ref, titulo: it.titulo, data: selecionada,
-          hora: it.hora, materia_id: it.materia_id, concluido: !it.concluido,
+          hora: it.hora, espaco_id: it.espaco_id, concluido: !it.concluido,
         });
         await carregarMes(mes);
       }));
@@ -334,7 +334,7 @@ window.Agenda = (function () {
     if (cx.classList.contains('oculto')) return;
 
     const r = await api('agenda', null, { de: hoje(), ate: hoje() });
-    materias = r.materias || [];
+    espacos = r.espacos || [];
     desenharRotinas();
   }
 
@@ -348,7 +348,7 @@ window.Agenda = (function () {
 
     const p = document.createElement('p');
     p.className = 'ag-subtitulo';
-    p.textContent = 'Aula some em feriado. Rotina pessoal continua aparecendo.';
+    p.textContent = 'Marque "para em feriado" no que segue calendario academico ou de trabalho.';
     cx.appendChild(p);
 
     const lista = document.createElement('ul');
@@ -366,7 +366,7 @@ window.Agenda = (function () {
       det.className = 'ag-detalhe';
       det.textContent = diasLegiveis(r.dias_semana)
         + (r.hora_inicio ? ' · ' + r.hora_inicio : '')
-        + ' · ' + (r.tipo === 'academica' ? 'aula' : 'pessoal');
+        + (r.pula_feriado ? ' · para em feriado' : '');
       li.appendChild(det);
 
       li.appendChild(botao('×', 'Excluir rotina', async () => {
@@ -421,20 +421,20 @@ window.Agenda = (function () {
     horaFim.type = 'time';
     horaFim.title = 'Fim';
 
-    const tipo = document.createElement('select');
-    [['pessoal', 'pessoal'], ['academica', 'aula']].forEach(([v, r]) => {
-      const o = document.createElement('option');
-      o.value = v;
-      o.textContent = r;
-      tipo.appendChild(o);
-    });
+    // Pergunta direta em vez de "é aula?": um projeto de trabalho também para
+    // em feriado, e um hábito pessoal não.
+    const rotFeriado = document.createElement('label');
+    rotFeriado.className = 'ag-dia-inteiro';
+    const pulaFeriado = document.createElement('input');
+    pulaFeriado.type = 'checkbox';
+    rotFeriado.append(pulaFeriado, document.createTextNode('para em feriado'));
 
     const mat = document.createElement('select');
     const vazio = document.createElement('option');
     vazio.value = '';
-    vazio.textContent = 'sem matéria';
+    vazio.textContent = 'sem espaço';
     mat.appendChild(vazio);
-    materias.forEach((m) => {
+    espacos.forEach((m) => {
       const o = document.createElement('option');
       o.value = m.id;
       o.textContent = m.nome;
@@ -445,7 +445,7 @@ window.Agenda = (function () {
     ok.type = 'submit';
     ok.textContent = 'Criar rotina';
 
-    f.append(nome, caixaDias, hora, horaFim, tipo, mat, ok);
+    f.append(nome, caixaDias, hora, horaFim, rotFeriado, mat, ok);
 
     f.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -454,17 +454,17 @@ window.Agenda = (function () {
 
       const r = await api('rotina.salvar', {
         titulo: nome.value.trim(),
-        tipo: tipo.value,
+        pula_feriado: pulaFeriado.checked,
         dias_semana: mascara,
         hora_inicio: hora.value || null,
         hora_fim: horaFim.value || null,
-        materia_id: mat.value || null,
+        espaco_id: mat.value || null,
       });
 
       rotinas.push({
-        id: r.id, titulo: nome.value.trim(), tipo: tipo.value,
+        id: r.id, titulo: nome.value.trim(), pula_feriado: pulaFeriado.checked,
         dias_semana: mascara, hora_inicio: hora.value || null,
-        hora_fim: horaFim.value || null, materia_id: mat.value || null,
+        hora_fim: horaFim.value || null, espaco_id: mat.value || null,
       });
 
       desenharRotinas();
@@ -479,7 +479,6 @@ window.Agenda = (function () {
   return {
     async abrir(opcoes) {
       api = opcoes.api;
-      aoAbrirMateria = opcoes.aoAbrirMateria || null;
       rotinas = opcoes.rotinas || rotinas;
 
       document.getElementById('agenda').classList.remove('oculto');

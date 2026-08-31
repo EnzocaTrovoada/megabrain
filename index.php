@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Sobe a cada mudança em CSS/JS: o LiteSpeed cacheia estático por dias e sem
 // isto você continuaria vendo a versão velha depois do upload.
-$versao = '8';
+$versao = '9';
 
 // Ícone do site. Procura o PNG nos dois lugares onde ele costuma ser largado e
 // cai no SVG do repositório se não achar nenhum — assim reenviar o index.php
@@ -143,8 +143,8 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
       <input type="search" id="busca" placeholder="Buscar…" autocomplete="off">
 
       <div class="secao">
-        <div class="secao-topo"><span>Matérias</span><button id="nova-materia" title="Nova matéria">+</button></div>
-        <ul id="materias"></ul>
+        <div class="secao-topo"><span>Espaços</span><button id="novo-espaco" title="Novo espaço">+</button></div>
+        <ul id="espacos"></ul>
       </div>
 
       <div class="secao">
@@ -162,7 +162,7 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
       <header class="barra">
         <button id="menu" class="so-mobile" title="Menu">☰</button>
         <input type="text" id="titulo" placeholder="Título da anotação" autocomplete="off">
-        <select id="materia-da-nota" title="Matéria"></select>
+        <select id="espaco-da-nota" title="Espaço"></select>
         <button id="alternar-ler" class="icone" title="Ler / editar (Ctrl+E)">◑</button>
         <button id="abrir-agenda" class="icone" title="Agenda (Ctrl+J)">▦</button>
         <button id="abrir-grafo" class="icone" title="Mapa mental (Ctrl+G)">◍</button>

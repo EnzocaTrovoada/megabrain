@@ -77,9 +77,9 @@ function ical_gerar(array $b, array $escopo, string $host): string
     $ate  = $hoje->modify('+' . ICAL_DIAS_DEPOIS . ' days')->format('Y-m-d');
 
     $dias      = agenda_entre($b, $de, $ate);
-    $materias  = [];
-    foreach ($b['materias'] as $m) {
-        $materias[$m['id']] = $m['nome'] ?? '';
+    $espacos  = [];
+    foreach ($b['espacos'] as $m) {
+        $espacos[$m['id']] = $m['nome'] ?? '';
     }
 
     $generico = !empty($escopo['titulos_genericos']);
@@ -121,18 +121,18 @@ function ical_gerar(array $b, array $escopo, string $host): string
                 continue;
             }
 
-            $materia = $materias[$it['materia_id'] ?? ''] ?? null;
+            $espaco = $espacos[$it['espaco_id'] ?? ''] ?? null;
 
             if ($generico) {
                 $titulo = match ($it['origem']) {
-                    'avaliacao'    => 'Avaliação' . ($materia ? ' — ' . $materia : ''),
+                    'avaliacao'    => 'Avaliação' . ($espaco ? ' — ' . $espaco : ''),
                     'rotina'       => 'Compromisso',
                     default        => 'Tarefa',
                 };
             } else {
                 $titulo = $it['titulo'];
-                if ($it['origem'] === 'avaliacao' && $materia) {
-                    $titulo = $materia . ' — ' . $titulo;
+                if ($it['origem'] === 'avaliacao' && $espaco) {
+                    $titulo = $espaco . ' — ' . $titulo;
                 }
             }
 
@@ -140,8 +140,8 @@ function ical_gerar(array $b, array $escopo, string $host): string
             if (!$generico && $it['origem'] === 'avaliacao' && empty($it['lancada'])) {
                 $descricao[] = 'Vale ' . $it['peso_media'] . '% da média final.';
             }
-            if (!$generico && $materia && $it['origem'] !== 'avaliacao') {
-                $descricao[] = $materia;
+            if (!$generico && $espaco && $it['origem'] !== 'avaliacao') {
+                $descricao[] = $espaco;
             }
 
             $l[] = 'BEGIN:VEVENT';

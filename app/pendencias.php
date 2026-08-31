@@ -38,7 +38,7 @@ function pendencias(array $b, bool $incluirFeitas = false): array
             $saida[] = $t + [
                 'nota_id'    => $n['id'] ?? null,
                 'nota'       => ($n['titulo'] ?? '') !== '' ? $n['titulo'] : 'Sem título',
-                'materia_id' => $n['materia_id'] ?? null,
+                'espaco_id' => $n['espaco_id'] ?? null,
             ];
         }
     }
@@ -152,7 +152,7 @@ function pendencias_por_data(array $b): array
             'ref'        => $p['nota_id'],
             'titulo'     => $p['texto'],
             'hora'       => null,
-            'materia_id' => $p['materia_id'],
+            'espaco_id' => $p['espaco_id'],
             'urgente'    => $p['urgente'],
             'nota'       => $p['nota'],
         ];

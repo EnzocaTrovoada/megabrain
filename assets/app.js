@@ -13,13 +13,13 @@ const CORES = ['#8b5cf6', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#ec4899',
 
 const el = {
   app: document.getElementById('app'),
-  materias: document.getElementById('materias'),
+  espacos: document.getElementById('espacos'),
   notas: document.getElementById('notas'),
   tituloNotas: document.getElementById('titulo-notas'),
   busca: document.getElementById('busca'),
   titulo: document.getElementById('titulo'),
   editor: document.getElementById('editor'),
-  seletor: document.getElementById('materia-da-nota'),
+  seletor: document.getElementById('espaco-da-nota'),
   estado: document.getElementById('estado'),
   vazio: document.getElementById('vazio'),
   backlinks: document.getElementById('backlinks'),
@@ -27,9 +27,30 @@ const el = {
   leitura: document.getElementById('leitura'),
 };
 
-let estado = { materias: [], anotacoes: [] };
-let materiaAtiva = null;   // null = todas
-let notaAberta = null;     // { id, titulo, conteudo, materia_id }
+let estado = { espacos: [], anotacoes: [] };
+
+/**
+ * O localStorage pode ter estado gravado por uma versão anterior, quando o
+ * agrupamento se chamava "matéria". Sem converter, a primeira renderização
+ * estoura em espacos.forEach e a tela fica em branco na atualização — que é
+ * exatamente o pior momento para quebrar.
+ */
+function normalizarEstado(e) {
+  if (!e || typeof e !== 'object') return { espacos: [], anotacoes: [] };
+
+  const espacos = Array.isArray(e.espacos) ? e.espacos
+    : (Array.isArray(e.materias) ? e.materias : []);
+
+  const anotacoes = (Array.isArray(e.anotacoes) ? e.anotacoes : []).map((n) => (
+    n && n.espaco_id === undefined && n.materia_id !== undefined
+      ? Object.assign({}, n, { espaco_id: n.materia_id })
+      : n
+  ));
+
+  return { espacos: espacos, anotacoes: anotacoes };
+}
+let espacoAtivo = null;   // null = todas
+let notaAberta = null;     // { id, titulo, conteudo, espaco_id }
 let sujo = false;
 let timer = null;
 
@@ -72,8 +93,8 @@ function recuperar(chave) {
 
 // -------------------------------------------------------------- listas
 
-function corDaMateria(id) {
-  const m = estado.materias.find((x) => x.id === id);
+function corDoEspaco(id) {
+  const m = estado.espacos.find((x) => x.id === id);
   return m ? m.cor : '#3a3a46';
 }
 
@@ -121,34 +142,34 @@ function item(texto, opcoes) {
   return li;
 }
 
-function desenharMaterias() {
-  el.materias.textContent = '';
+function desenharEspacos() {
+  el.espacos.textContent = '';
 
-  el.materias.appendChild(item('Todas', {
-    ativa: materiaAtiva === null,
-    aoClicar: () => { materiaAtiva = null; desenhar(); },
+  el.espacos.appendChild(item('Todos', {
+    ativa: espacoAtivo === null,
+    aoClicar: () => { espacoAtivo = null; desenhar(); },
   }));
 
-  estado.materias.forEach((m) => {
-    el.materias.appendChild(item(m.nome, {
+  estado.espacos.forEach((m) => {
+    el.espacos.appendChild(item(m.nome, {
       cor: m.cor,
-      ativa: materiaAtiva === m.id,
-      aoClicar: () => { materiaAtiva = m.id; desenhar(); },
+      ativa: espacoAtivo === m.id,
+      aoClicar: () => { espacoAtivo = m.id; desenhar(); },
       aoTrocarCor: async () => {
         const i = CORES.indexOf(m.cor);
-        await api('materia.salvar', { id: m.id, nome: m.nome, cor: CORES[(i + 1) % CORES.length] });
+        await api('espaco.salvar', { id: m.id, nome: m.nome, cor: CORES[(i + 1) % CORES.length] });
         await carregar();
       },
       aoEditar: async () => {
-        const nome = prompt('Nome da matéria', m.nome);
+        const nome = prompt('Nome do espaço', m.nome);
         if (nome === null || !nome.trim() || nome.trim() === m.nome) return;
-        await api('materia.salvar', { id: m.id, nome: nome.trim(), cor: m.cor });
+        await api('espaco.salvar', { id: m.id, nome: nome.trim(), cor: m.cor });
         await carregar();
       },
       aoExcluir: async () => {
-        if (!confirm('Excluir a matéria "' + m.nome + '"?\nAs anotações dela não são apagadas, ficam sem matéria.')) return;
-        await api('materia.excluir', { id: m.id });
-        if (materiaAtiva === m.id) materiaAtiva = null;
+        if (!confirm('Excluir o espaço "' + m.nome + '"?\nAs anotações dela não são apagadas, ficam sem espaço.')) return;
+        await api('espaco.excluir', { id: m.id });
+        if (espacoAtivo === m.id) espacoAtivo = null;
         await carregar();
       },
     }));
@@ -159,7 +180,7 @@ function notasVisiveis() {
   const q = el.busca.value.trim().toLowerCase();
 
   return estado.anotacoes
-    .filter((n) => materiaAtiva === null || n.materia_id === materiaAtiva)
+    .filter((n) => espacoAtivo === null || n.espaco_id === espacoAtivo)
     .filter((n) => q === '' || (n.titulo || '').toLowerCase().includes(q))
     .sort((a, b) => (b.atualizado_em || '').localeCompare(a.atualizado_em || ''));
 }
@@ -167,7 +188,7 @@ function notasVisiveis() {
 function desenharNotas() {
   el.notas.textContent = '';
 
-  const m = estado.materias.find((x) => x.id === materiaAtiva);
+  const m = estado.espacos.find((x) => x.id === espacoAtivo);
   el.tituloNotas.textContent = m ? m.nome : 'Anotações';
 
   const lista = notasVisiveis();
@@ -182,7 +203,7 @@ function desenharNotas() {
 
   lista.forEach((n) => {
     el.notas.appendChild(item(n.titulo || 'Sem título', {
-      cor: n.materia_id ? corDaMateria(n.materia_id) : null,
+      cor: n.espaco_id ? corDoEspaco(n.espaco_id) : null,
       ativa: notaAberta && notaAberta.id === n.id,
       aoClicar: () => abrir(n.id),
       aoExcluir: async () => {
@@ -200,21 +221,21 @@ function desenharSeletor() {
 
   const vazio = document.createElement('option');
   vazio.value = '';
-  vazio.textContent = 'sem matéria';
+  vazio.textContent = 'sem espaço';
   el.seletor.appendChild(vazio);
 
-  estado.materias.forEach((m) => {
+  estado.espacos.forEach((m) => {
     const o = document.createElement('option');
     o.value = m.id;
     o.textContent = m.nome;
     el.seletor.appendChild(o);
   });
 
-  el.seletor.value = (notaAberta && notaAberta.materia_id) || '';
+  el.seletor.value = (notaAberta && notaAberta.espaco_id) || '';
 }
 
 function desenhar() {
-  desenharMaterias();
+  desenharEspacos();
   desenharNotas();
   desenharSeletor();
 
@@ -308,7 +329,7 @@ async function salvarJa() {
     id: notaAberta.id,
     titulo: el.titulo.value,
     conteudo: el.editor.value,
-    materia_id: el.seletor.value || null,
+    espaco_id: el.seletor.value || null,
   };
 
   // Guarda local antes da rede: se o wifi da faculdade cair, o texto sobrevive.
@@ -317,7 +338,7 @@ async function salvarJa() {
   try {
     await api('nota.salvar', payload);
     notaAberta.titulo = payload.titulo;
-    notaAberta.materia_id = payload.materia_id;
+    notaAberta.espaco_id = payload.espaco_id;
     marcar('salvo', 'salvo');
     await carregar(true);
     // O texto salvo pode ter criado ou concluído uma caixa "- [ ]".
@@ -332,12 +353,12 @@ async function salvarJa() {
 
 async function carregar(silencioso) {
   try {
-    estado = await api('estado');
+    estado = normalizarEstado(await api('estado'));
     guardar('mb_estado', estado);
   } catch (e) {
     const cache = recuperar('mb_estado');
     if (cache) {
-      estado = cache;
+      estado = normalizarEstado(cache);
       if (!silencioso) marcar('falhou', 'offline');
     }
   }
@@ -352,13 +373,19 @@ el.titulo.addEventListener('input', agendar);
 el.seletor.addEventListener('change', () => { sujo = true; salvarJa(); });
 el.busca.addEventListener('input', desenharNotas);
 
-document.getElementById('nova-materia').addEventListener('click', async () => {
-  const nome = prompt('Nome da matéria');
+document.getElementById('novo-espaco').addEventListener('click', async () => {
+  const nome = prompt('Nome do espaço (matéria, projeto, área da vida…)');
   if (!nome || !nome.trim()) return;
 
-  await api('materia.salvar', {
+  // Só disciplina ganha árvore de notas e cálculo de média. O resto é
+  // agrupamento puro — que é o caso da maioria dos projetos.
+  const resp = (prompt('Tipo: 1 disciplina · 2 projeto · 3 pessoal', '2') || '2').trim();
+  const tipo = { '1': 'disciplina', '2': 'projeto', '3': 'pessoal' }[resp] || 'projeto';
+
+  await api('espaco.salvar', {
     nome: nome.trim(),
-    cor: CORES[estado.materias.length % CORES.length],
+    tipo: tipo,
+    cor: CORES[estado.espacos.length % CORES.length],
   });
   await carregar();
 });
@@ -368,7 +395,7 @@ document.getElementById('nova-nota').addEventListener('click', async () => {
   const r = await api('nota.salvar', {
     titulo: '',
     conteudo: '',
-    materia_id: materiaAtiva,
+    espaco_id: espacoAtivo,
   });
   await carregar(true);
   await abrir(r.id);
@@ -494,7 +521,7 @@ el.leitura.addEventListener('click', async (ev) => {
   if (achada) return abrir(achada.id);
 
   if (confirm('A nota "' + alvo + '" ainda não existe. Criar?')) {
-    const r = await api('nota.salvar', { titulo: alvo, conteudo: '', materia_id: materiaAtiva });
+    const r = await api('nota.salvar', { titulo: alvo, conteudo: '', espaco_id: espacoAtivo });
     await carregar(true);
     await abrir(r.id);
     aplicarModo('escrever');
@@ -675,11 +702,11 @@ async function abrirGrafo() {
     local: document.getElementById('grafo-local').checked,
     aoAbrir: async (no) => {
       if (no.tipo === 'nota') { Grafo.fechar(); await abrir(no.ref); return; }
-      if (no.tipo === 'materia') { materiaAtiva = no.ref; Grafo.fechar(); desenhar(); return; }
+      if (no.tipo === 'espaco') { espacoAtivo = no.ref; Grafo.fechar(); desenhar(); return; }
 
       // Nó fantasma: link para nota que ainda não existe. Clicar cria.
       if (no.tipo === 'fantasma' && confirm('Criar a nota "' + no.rotulo + '"?')) {
-        const r = await api('nota.salvar', { titulo: no.rotulo, conteudo: '', materia_id: materiaAtiva });
+        const r = await api('nota.salvar', { titulo: no.rotulo, conteudo: '', espaco_id: espacoAtivo });
         Grafo.fechar();
         await carregar(true);
         await abrir(r.id);
@@ -708,7 +735,7 @@ document.addEventListener('keydown', (ev) => {
 // --------------------------------------------------------------- início
 
 const cacheInicial = recuperar('mb_estado');
-if (cacheInicial) { estado = cacheInicial; desenhar(); }
+if (cacheInicial) { estado = normalizarEstado(cacheInicial); desenhar(); }
 
 // Retoma o modo da última sessão, mas nunca cai no dividido em tela estreita.
 const modoSalvo = recuperar('mb_modo');

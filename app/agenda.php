@@ -85,8 +85,8 @@ function agenda_entre(array $b, string $de, string $ate): array
                 continue;
             }
 
-            // Aula pula feriado; academia não. Feriado não fecha academia.
-            if ($doDia !== null && ($r['tipo'] ?? 'pessoal') === 'academica') {
+            // Rotina marcada para de acontecer em feriado; habito pessoal, nao.
+            if ($doDia !== null && !empty($r['pula_feriado'])) {
                 continue;
             }
 
@@ -94,11 +94,11 @@ function agenda_entre(array $b, string $de, string $ate): array
                 'origem'     => 'rotina',
                 'ref'        => $r['id'] ?? null,
                 'titulo'     => $r['titulo'] ?? '',
-                'tipo'       => $r['tipo'] ?? 'pessoal',
+                'pula_feriado' => !empty($r['pula_feriado']),
                 'hora'       => $ex['nova_hora'] ?? ($r['hora_inicio'] ?? null),
                 'hora_fim'   => $r['hora_fim'] ?? null,
                 'local'      => $r['local'] ?? null,
-                'materia_id' => $r['materia_id'] ?? null,
+                'espaco_id' => $r['espaco_id'] ?? null,
                 'movida'     => $ex !== null,
             ];
         }
@@ -111,7 +111,7 @@ function agenda_entre(array $b, string $de, string $ate): array
                 'hora'        => $c['hora'] ?? null,
                 'hora_fim'    => $c['hora_fim'] ?? null,
                 'dia_inteiro' => !empty($c['dia_inteiro']),
-                'materia_id'  => $c['materia_id'] ?? null,
+                'espaco_id'  => $c['espaco_id'] ?? null,
                 'concluido'   => !empty($c['concluido']),
             ];
         }
@@ -156,8 +156,8 @@ function avaliacoes_por_data(array $b): array
 {
     $saida = [];
 
-    foreach ($b['materias'] as $m) {
-        if (empty($m['raiz'])) {
+    foreach ($b['espacos'] as $m) {
+        if (empty($m['raiz']) || ($m['tipo'] ?? 'disciplina') !== 'disciplina') {
             continue;
         }
         coletar_avaliacoes_datadas($m['raiz'], $m, 1.0, $saida);
@@ -171,7 +171,7 @@ function avaliacoes_por_data(array $b): array
  *
  * @param array<string, list<array<string, mixed>>> $saida
  */
-function coletar_avaliacoes_datadas(array $no, array $materia, float $fracao, array &$saida): void
+function coletar_avaliacoes_datadas(array $no, array $espaco, float $fracao, array &$saida): void
 {
     if (($no['tipo'] ?? 'grupo') === 'avaliacao') {
         if (empty($no['data_prevista']) || ($no['status'] ?? '') === 'dispensada') {
@@ -183,7 +183,7 @@ function coletar_avaliacoes_datadas(array $no, array $materia, float $fracao, ar
             'ref'        => $no['id'] ?? null,
             'titulo'     => $no['titulo'] ?? 'Avaliação',
             'hora'       => $no['hora'] ?? null,
-            'materia_id' => $materia['id'] ?? null,
+            'espaco_id' => $espaco['id'] ?? null,
             'peso_media' => round($fracao * 100, 1),
             'lancada'    => ($no['nota_obtida'] ?? null) !== null,
         ];
@@ -218,6 +218,6 @@ function coletar_avaliacoes_datadas(array $no, array $materia, float $fracao, ar
             ? (float) ($f['nota_maxima'] ?? $f['pontos_totais'] ?? 0)
             : (float) ($f['peso'] ?? 1);
 
-        coletar_avaliacoes_datadas($f, $materia, $total > 0 ? $fracao * ($parte / $total) : 0.0, $saida);
+        coletar_avaliacoes_datadas($f, $espaco, $total > 0 ? $fracao * ($parte / $total) : 0.0, $saida);
     }
 }

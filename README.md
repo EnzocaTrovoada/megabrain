@@ -1,7 +1,19 @@
 # Megabrain — segundo cérebro acadêmico
 
-Anotações em markdown organizadas por matéria, com login, rodando em hospedagem
-compartilhada. Sem framework, sem build, sem banco: deploy é copiar arquivo.
+Anotações, agenda e pendências organizadas por **espaço** — disciplina, projeto
+ou área da vida. Login, rodando em hospedagem compartilhada. Sem framework, sem
+build, sem banco: deploy é copiar arquivo.
+
+O espaço é o container genérico; o que muda comportamento é o **tipo**:
+
+| Tipo | Para quê | Ganha |
+|---|---|---|
+| `disciplina` | matéria da faculdade | árvore de avaliações e cálculo de média |
+| `projeto` | trabalho, side project, ideia | agrupamento e cor |
+| `pessoal` | saúde, finanças, casa | agrupamento e cor |
+
+Rotina não pergunta "é aula?", pergunta **"para em feriado?"** — porque um
+projeto de trabalho também para, e um hábito pessoal não.
 
 **A raiz deste repositório é o `public_html` do domínio.** É o que permite o
 deploy por git da Hostinger clonar direto, sem pasta duplicada no caminho.
