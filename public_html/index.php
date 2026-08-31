@@ -53,7 +53,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Sobe a cada mudança em CSS/JS: o LiteSpeed cacheia estático por dias e sem
 // isto você continuaria vendo a versão velha depois do upload.
-$versao = '3';
+$versao = '4';
+
+// Ícone do site. Procura o PNG nos dois lugares onde ele costuma ser largado e
+// cai no SVG do repositório se não achar nenhum — assim reenviar o index.php
+// nunca apaga um ícone que foi trocado direto no servidor.
+$icone = 'assets/icone.svg';
+foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
+    if (is_file(__DIR__ . '/' . $candidato)) {
+        $icone = $candidato;
+        break;
+    }
+}
 ?>
 <!doctype html>
 <html lang="pt-BR">
@@ -62,7 +73,9 @@ $versao = '3';
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d0d0f">
 <title>Megabrain</title>
-<link rel="manifest" href="manifest.json">
+<link rel="icon" href="<?= e($icone) ?>?v=<?= e($versao) ?>">
+<link rel="apple-touch-icon" href="<?= e($icone) ?>?v=<?= e($versao) ?>">
+<link rel="manifest" href="manifest.json?v=<?= e($versao) ?>">
 <link rel="stylesheet" href="assets/app.css?v=<?= e($versao) ?>">
 </head>
 <body class="modo-<?= e($modo) ?>">
