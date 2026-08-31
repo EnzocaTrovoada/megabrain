@@ -94,9 +94,23 @@ mostra o grafo local com profundidade ajustável.
 
 ## Ler e imagens
 
-O botão **◑** (ou `Ctrl+E`) alterna entre escrever e ler. No modo leitura o
-markdown é renderizado, os `[[wikilinks]]` viram clicáveis (link para nota que
-não existe oferece criar) e as imagens aparecem.
+O botão **◑** (ou `Ctrl+E`) cicla entre três modos:
+
+| Modo | Ícone | O que mostra |
+|---|---|---|
+| escrever | ◑ | só o editor, markdown cru |
+| dividido | ◐ | editor e leitura lado a lado, atualizando enquanto você digita |
+| ler | ● | só o resultado renderizado |
+
+No celular o ciclo pula o dividido — não cabem duas colunas em 375px.
+
+O dividido existe porque `textarea` não renderiza imagem dentro de si. Para ver
+a foto do quadro enquanto escreve, ela precisa aparecer ao lado. (O Obsidian
+mostra inline porque não usa `textarea`; fazer igual aqui significa trocar o
+editor por `contenteditable`, o que está na lista mas não é barato.)
+
+No modo leitura os `[[wikilinks]]` viram clicáveis — link para nota que ainda
+não existe oferece criar.
 
 Suportado: `#` títulos, `**negrito**`, `*itálico*`, `~~riscado~~`, `` `código` ``,
 blocos ```` ``` ````, listas, `- [ ]` e `- [x]` como caixas, `>` citação,

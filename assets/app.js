@@ -254,7 +254,7 @@ function aplicar(n) {
   marcar('', '');
   desenharBacklinks(n.backlinks || []);
   // Trocar de nota no modo leitura mantém o modo, mas o conteúdo é outro.
-  if (lendo) el.leitura.innerHTML = Markdown.renderizar(el.editor.value);
+  if (modo !== 'escrever') renderizarPreview();
   desenhar();
 }
 
@@ -345,6 +345,7 @@ async function carregar(silencioso) {
 // -------------------------------------------------------------- eventos
 
 el.editor.addEventListener('input', agendar);
+el.editor.addEventListener('input', agendarPreview);
 el.titulo.addEventListener('input', agendar);
 el.seletor.addEventListener('change', () => { sujo = true; salvarJa(); });
 el.busca.addEventListener('input', desenharNotas);
@@ -394,7 +395,7 @@ el.titulo.addEventListener('blur', salvarJa);
 document.addEventListener('keydown', (ev) => {
   if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') { ev.preventDefault(); salvarJa(); }
   if ((ev.metaKey || ev.ctrlKey) && ev.key === 'k') { ev.preventDefault(); el.busca.focus(); el.busca.select(); }
-  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'e') { ev.preventDefault(); alternarLeitura(); }
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'e') { ev.preventDefault(); proximoModo(); }
 });
 
 // Tab dentro do editor indenta em vez de pular pro próximo campo.
@@ -413,21 +414,70 @@ el.editor.addEventListener('keydown', (ev) => {
 
 // ------------------------------------------------------ ler vs escrever
 
-let lendo = false;
+/**
+ * Três modos: escrever, dividido e ler.
+ *
+ * O dividido existe porque textarea não renderiza imagem dentro de si — para
+ * ver a foto do quadro enquanto digita, ela tem que aparecer ao lado. No
+ * celular não cabem duas colunas, então lá o ciclo pula o dividido.
+ */
+const BOTAO_MODO = {
+  escrever: { icone: '◑', dica: 'Ver ao lado (Ctrl+E)' },
+  dividido: { icone: '◐', dica: 'Só leitura (Ctrl+E)' },
+  ler:      { icone: '●', dica: 'Voltar a escrever (Ctrl+E)' },
+};
 
-function alternarLeitura(forcar) {
-  lendo = forcar === undefined ? !lendo : forcar;
+let modo = 'escrever';
+let timerPreview = null;
 
-  if (lendo) {
-    el.leitura.innerHTML = Markdown.renderizar(el.editor.value);
-  }
-
-  el.editor.classList.toggle('oculto', lendo);
-  el.leitura.classList.toggle('oculto', !lendo);
-  document.getElementById('alternar-ler').classList.toggle('ligado', lendo);
-
-  if (!lendo) el.editor.focus();
+function ehEstreito() {
+  // Largura 0 acontece em contexto sem janela real; celular nenhum mede zero,
+  // então nesse caso não vale tratar como tela estreita.
+  return window.innerWidth > 0 && window.innerWidth <= 760;
 }
+
+function renderizarPreview() {
+  el.leitura.innerHTML = Markdown.renderizar(el.editor.value);
+}
+
+function aplicarModo(novo) {
+  modo = novo;
+
+  const mostraEditor  = modo !== 'ler';
+  const mostraLeitura = modo !== 'escrever';
+
+  if (mostraLeitura) renderizarPreview();
+
+  el.editor.classList.toggle('oculto', !mostraEditor);
+  el.leitura.classList.toggle('oculto', !mostraLeitura);
+  document.querySelector('.area-editor').classList.toggle('dividido', modo === 'dividido');
+
+  const b = document.getElementById('alternar-ler');
+  b.textContent = BOTAO_MODO[modo].icone;
+  b.title = BOTAO_MODO[modo].dica;
+  b.classList.toggle('ligado', modo !== 'escrever');
+
+  if (modo === 'escrever') el.editor.focus();
+
+  guardar('mb_modo', modo);
+}
+
+function proximoModo() {
+  const ciclo = ehEstreito() ? ['escrever', 'ler'] : ['escrever', 'dividido', 'ler'];
+  aplicarModo(ciclo[(ciclo.indexOf(modo) + 1) % ciclo.length]);
+}
+
+/** No dividido o preview acompanha a digitação, com folga para não pesar. */
+function agendarPreview() {
+  if (modo === 'escrever') return;
+  clearTimeout(timerPreview);
+  timerPreview = setTimeout(renderizarPreview, 150);
+}
+
+// Girar o celular pode tirar a largura que o dividido precisa.
+window.addEventListener('resize', () => {
+  if (modo === 'dividido' && ehEstreito()) aplicarModo('ler');
+});
 
 // Wikilink no modo leitura: abre a nota pelo título, ou oferece criar.
 el.leitura.addEventListener('click', async (ev) => {
@@ -445,20 +495,21 @@ el.leitura.addEventListener('click', async (ev) => {
     const r = await api('nota.salvar', { titulo: alvo, conteudo: '', materia_id: materiaAtiva });
     await carregar(true);
     await abrir(r.id);
-    alternarLeitura(false);
+    aplicarModo('escrever');
   }
 });
 
 /**
- * Mesmo casamento do servidor: sem acento, sem maiúscula.
-  return t.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
- * escrito por escape para o arquivo não depender da codificação em que é salvo.
+ * Mesmo casamento do servidor: sem acento, sem maiuscula.
+ * O intervalo ̀-ͯ e o dos acentos combinantes que o NFD separa.
+ * O arquivo e UTF-8 e o .gitattributes o mantem assim. Se um dia a codificacao
+ * for mexida, e esta linha que quebra primeiro.
  */
 function normalizarTitulo(t) {
   return t.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-document.getElementById('alternar-ler').addEventListener('click', () => alternarLeitura());
+document.getElementById('alternar-ler').addEventListener('click', proximoModo);
 
 // ------------------------------------------------------ colar imagem
 
@@ -656,4 +707,12 @@ document.addEventListener('keydown', (ev) => {
 
 const cacheInicial = recuperar('mb_estado');
 if (cacheInicial) { estado = cacheInicial; desenhar(); }
+
+// Retoma o modo da última sessão, mas nunca cai no dividido em tela estreita.
+const modoSalvo = recuperar('mb_modo');
+aplicarModo(
+  (modoSalvo === 'dividido' && ehEstreito()) ? 'ler'
+    : (BOTAO_MODO[modoSalvo] ? modoSalvo : 'escrever')
+);
+
 carregar();

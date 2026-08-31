@@ -225,6 +225,11 @@ code { font-family: var(--mono); font-size: .9em; }
 
 .area-editor { flex: 1; position: relative; display: flex; min-height: 0; }
 
+/* Dividido: editor e leitura lado a lado, cada um rolando por conta propria. */
+.area-editor.dividido > #editor,
+.area-editor.dividido > .leitura { flex: 1 1 50%; min-width: 0; max-width: none; }
+.area-editor.dividido > .leitura { border-left: 1px solid var(--linha); }
+
 /* ------------------------------------------------------- modo leitura */
 
 .icone.ligado { color: var(--acento); background: #201a2e; }

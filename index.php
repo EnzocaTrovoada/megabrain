@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Sobe a cada mudança em CSS/JS: o LiteSpeed cacheia estático por dias e sem
 // isto você continuaria vendo a versão velha depois do upload.
-$versao = '4';
+$versao = '5';
 
 // Ícone do site. Procura o PNG nos dois lugares onde ele costuma ser largado e
 // cai no SVG do repositório se não achar nenhum — assim reenviar o index.php
