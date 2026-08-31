@@ -18,6 +18,7 @@ $mutacoes = [
     'materia.salvar', 'materia.excluir', 'nota.salvar', 'nota.excluir', 'arquivo.enviar',
     'rotina.salvar', 'rotina.excluir', 'rotina.excecao',
     'compromisso.salvar', 'compromisso.excluir',
+    'feed.criar', 'feed.revogar',
 ];
 if (in_array($acao, $mutacoes, true)) {
     $enviado = $_SERVER['HTTP_X_CSRF'] ?? '';
@@ -352,6 +353,78 @@ switch ($acao) {
         ));
 
         json_saida(['ok' => salvar_base($b)]);
+
+        // no break
+
+    case 'feed.listar':
+        $lista = [];
+        foreach (ler_json(caminho('feeds.json'), []) as $f) {
+            if (!empty($f['revogado_em'])) {
+                continue;
+            }
+            // O token nunca volta: so existe em claro no instante da criacao.
+            $lista[] = [
+                'id'             => $f['id'] ?? '',
+                'nome'           => $f['nome'] ?? '',
+                'escopo'         => $f['escopo'] ?? [],
+                'criado_em'      => $f['criado_em'] ?? null,
+                'ultimo_acesso'  => $f['ultimo_acesso'] ?? null,
+                'acessos'        => (int) ($f['acessos'] ?? 0),
+            ];
+        }
+
+        json_saida(['feeds' => $lista]);
+
+        // no break
+
+    case 'feed.criar':
+        $d = corpo();
+
+        $token = bin2hex(random_bytes(32));
+        $id    = novo_id();
+        $feeds = ler_json(caminho('feeds.json'), []);
+
+        $feeds[hash('sha256', $token)] = [
+            'id'        => $id,
+            'nome'      => texto($d, 'nome', 60) ?: 'Celular',
+            'criado_em' => agora(),
+            'escopo'    => [
+                'feriados'          => !empty($d['feriados']),
+                'titulos_genericos' => !empty($d['titulos_genericos']),
+                'tipos'             => array_values(array_intersect(
+                    is_array($d['tipos'] ?? null) ? $d['tipos'] : [],
+                    ['avaliacao', 'compromisso', 'rotina']
+                )) ?: ['avaliacao', 'compromisso', 'rotina'],
+            ],
+        ];
+
+        if (!escrever_json(caminho('feeds.json'), $feeds)) {
+            json_saida(['erro' => 'escrita'], 500);
+        }
+
+        $base = (em_https() ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? '');
+
+        // dirname() usa o separador do sistema: no Windows devolve "\\" e a URL
+        // sai quebrada. Normalizamos em vez de confiar no sistema de arquivos.
+        $dir = rtrim(strtr(dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/')), DIRECTORY_SEPARATOR, '/'), '/');
+
+        json_saida(['ok' => true, 'id' => $id, 'url' => $base . $dir . '/ical.php?t=' . $token]);
+
+        // no break
+
+    case 'feed.revogar':
+        $id    = texto(corpo(), 'id', 24);
+        $feeds = ler_json(caminho('feeds.json'), []);
+
+        foreach ($feeds as $k => $f) {
+            if (($f['id'] ?? '') === $id) {
+                // Marcado em vez de apagado: o registro de acessos e a prova de
+                // que o link vazado parou de responder.
+                $feeds[$k]['revogado_em'] = agora();
+            }
+        }
+
+        json_saida(['ok' => escrever_json(caminho('feeds.json'), $feeds)]);
 
         // no break
 

@@ -496,3 +496,18 @@ code { font-family: var(--mono); font-size: .9em; }
   .agenda-dia { padding: 1rem; }
   .agenda-barra { flex-wrap: wrap; gap: .4rem; }
 }
+
+.ag-criar-feed {
+  margin-top: .8rem; background: var(--acento); color: #fff; border: 0;
+  border-radius: 7px; padding: .45rem 1rem; cursor: pointer; font-weight: 600;
+}
+.ag-link { display: flex; gap: .4rem; margin-top: .8rem; }
+.ag-link input {
+  flex: 1; min-width: 0; background: #0b0b0e; border: 1px solid var(--acento);
+  border-radius: 7px; padding: .45rem .6rem; color: var(--texto);
+  font: .78rem var(--mono); outline: none;
+}
+.ag-link button {
+  background: #24242c; border: 1px solid var(--linha); color: var(--texto);
+  border-radius: 7px; padding: .45rem .8rem; cursor: pointer;
+}

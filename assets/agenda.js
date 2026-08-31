@@ -470,3 +470,105 @@ window.Agenda = (function () {
     definirRotinas(lista) { rotinas = lista || []; },
   };
 })();
+
+/**
+ * Assinatura no celular. O token só existe em claro neste instante — depois
+ * fica só o SHA-256 no servidor, e não há como mostrá-lo de novo. Por isso a
+ * URL é exibida numa caixa selecionável em vez de sumir num alerta.
+ */
+window.Agenda.painelCelular = async function (api) {
+  const cx = document.getElementById('agenda-rotinas');
+  cx.classList.remove('oculto');
+  cx.textContent = '';
+
+  const h = document.createElement('h3');
+  h.textContent = 'Assinar no celular';
+  cx.appendChild(h);
+
+  const p = document.createElement('p');
+  p.className = 'ag-subtitulo';
+  p.textContent = 'Gera um link só de leitura. O calendário do celular sincroniza sozinho e avisa da prova na véspera.';
+  cx.appendChild(p);
+
+  const lista = document.createElement('ul');
+  lista.className = 'ag-rotinas';
+  cx.appendChild(lista);
+
+  async function recarregar() {
+    const r = await api('feed.listar');
+    lista.textContent = '';
+
+    (r.feeds || []).forEach((f) => {
+      const li = document.createElement('li');
+
+      const nome = document.createElement('span');
+      nome.className = 'ag-titulo';
+      nome.textContent = f.nome;
+      li.appendChild(nome);
+
+      const det = document.createElement('span');
+      det.className = 'ag-detalhe';
+      det.textContent = f.acessos
+        ? f.acessos + ' sincronizações · última ' + (f.ultimo_acesso || '').slice(0, 10)
+        : 'nunca sincronizado';
+      li.appendChild(det);
+
+      const x = document.createElement('button');
+      x.className = 'ag-acao';
+      x.textContent = '×';
+      x.title = 'Revogar';
+      x.addEventListener('click', async () => {
+        if (!confirm('Revogar "' + f.nome + '"? O celular para de sincronizar.')) return;
+        await api('feed.revogar', { id: f.id });
+        await recarregar();
+      });
+      li.appendChild(x);
+
+      lista.appendChild(li);
+    });
+  }
+
+  await recarregar();
+
+  const criar = document.createElement('button');
+  criar.className = 'ag-criar-feed';
+  criar.textContent = 'Gerar link';
+  criar.addEventListener('click', async () => {
+    const r = await api('feed.criar', { nome: 'Celular', feriados: true });
+
+    const caixa = document.createElement('div');
+    caixa.className = 'ag-link';
+
+    const campo = document.createElement('input');
+    campo.type = 'text';
+    campo.readOnly = true;
+    campo.value = r.url;
+    campo.addEventListener('focus', () => campo.select());
+
+    const copiar = document.createElement('button');
+    copiar.type = 'button';
+    copiar.textContent = 'copiar';
+    copiar.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(r.url);
+        copiar.textContent = 'copiado';
+      } catch (e) {
+        campo.select();               // sem permissão de área de transferência
+        copiar.textContent = 'Ctrl+C';
+      }
+    });
+
+    const aviso = document.createElement('p');
+    aviso.className = 'ag-subtitulo';
+    aviso.textContent = 'Copie agora: este link não aparece de novo. Se vazar, revogue aqui — ele não dá acesso à conta nem permite escrever.';
+
+    caixa.append(campo, copiar);
+    cx.append(caixa, aviso);
+    criar.remove();
+
+    campo.focus();
+    await recarregar();
+  });
+
+  cx.appendChild(criar);
+};

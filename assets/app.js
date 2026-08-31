@@ -734,6 +734,7 @@ document.getElementById('ag-anterior').addEventListener('click', () => Agenda.mo
 document.getElementById('ag-proximo').addEventListener('click', () => Agenda.mover(1));
 document.getElementById('ag-hoje').addEventListener('click', () => Agenda.irParaHoje());
 document.getElementById('ag-rotinas').addEventListener('click', () => Agenda.alternarRotinas());
+document.getElementById('ag-celular').addEventListener('click', () => Agenda.painelCelular(api));
 
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && Agenda.aberto()) Agenda.fechar();
