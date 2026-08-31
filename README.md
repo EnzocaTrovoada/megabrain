@@ -3,34 +3,43 @@
 Anotações em markdown organizadas por matéria, com login, rodando em hospedagem
 compartilhada. Sem framework, sem build, sem banco: deploy é copiar arquivo.
 
-```
-public_html/            o que vai para o servidor
-  index.php             instalação, login e casca do app
-  api.php               API JSON (uma ação por requisição)
-  app/nucleo.php        sessão, armazenamento, limites  (bloqueado por .htaccess)
-  assets/               app.css, app.js, icone.svg
-  manifest.json         permite "adicionar à tela de início" no celular
-  .htaccess
+**A raiz deste repositório é o `public_html` do domínio.** É o que permite o
+deploy por git da Hostinger clonar direto, sem pasta duplicada no caminho.
 
-dados/                  criado sozinho, UM NÍVEL ACIMA do public_html
-  config.json           hash da sua senha
-  base.json             matérias e anotações
-  sessoes.json          sessões ativas
-  tentativas.json       controle de força bruta
+```
+index.php               instalação, login e casca do app
+api.php                 API JSON (uma ação por requisição)
+app/nucleo.php          sessão, armazenamento, limites  (bloqueado por .htaccess)
+assets/                 app.css, app.js, grafo.js, markdown.js, ícones
+manifest.json           permite "adicionar à tela de início" no celular
+.htaccess
 
 src/Servico/            núcleo de cálculo de média (ainda sem tela)
-testes/ e bin/          testes do cálculo — ferramenta de desenvolvimento
+testes/ e bin/          testes do cálculo — bloqueados por .htaccess
+
+../dados/               criado sozinho, UM NÍVEL ACIMA — fora do público
+  config.json           hash da sua senha
+  base.json             matérias e anotações
+  arquivos/             imagens enviadas
+  sessoes.json          sessões ativas
+  tentativas.json       controle de força bruta
 ```
 
 ## Subir na Hostinger
 
-1. Envie o **conteúdo** de `public_html/` para o `public_html` do domínio.
-   A pasta `dados/` **não** é enviada: o PHP cria sozinho, fora do público.
-2. Apague o `default.php` que a Hostinger deixa lá — ele responde na raiz e
+Por git (recomendado): aponte o deploy do hPanel para este repositório e
+clone dentro do `public_html`. A pasta `dados/` fica fora do repositório de
+propósito, então `git pull` nunca encosta nos seus dados.
+
+Por FTP: envie o conteúdo da raiz do repositório para o `public_html`.
+
+Nos dois casos, uma vez só:
+
+1. Apague o `default.php` que a Hostinger deixa lá — ele responde na raiz e
    esconde o app.
-3. Apague `bin/diagnostico.php` do servidor: ele expõe caminho absoluto,
+2. Apague `bin/diagnostico.php` do servidor: ele expõe caminho absoluto,
    versão do PHP e extensões.
-4. Abra o domínio. Aparece a tela de instalação, pedindo um código.
+3. Abra o domínio. Aparece a tela de instalação, pedindo um código.
 5. O código está em `dados/CODIGO-DE-INSTALACAO.txt`, gerado pelo servidor na
    primeira visita. Abra pelo Gerenciador de Arquivos da Hostinger, informe o
    código e escolha sua senha.
