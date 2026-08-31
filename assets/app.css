@@ -511,3 +511,25 @@ code { font-family: var(--mono); font-size: .9em; }
   background: #24242c; border: 1px solid var(--linha); color: var(--texto);
   border-radius: 7px; padding: .45rem .8rem; cursor: pointer;
 }
+
+/* --------------------------------------------------------- pendências */
+
+.pendencia { gap: .45rem; }
+.pendencia input[type="checkbox"] { accent-color: var(--acento); cursor: pointer; flex: 0 0 auto; }
+.pendencia.urgente .rotulo { color: #ffb3b3; }
+.pendencia.urgente::before {
+  content: '!'; color: var(--erro); font-weight: 700; flex: 0 0 auto; font-size: .8rem;
+}
+.pendencia .prazo {
+  font: .7rem var(--mono); color: var(--fraco);
+  background: #1c1c22; border-radius: 4px; padding: .05rem .3rem; flex: 0 0 auto;
+}
+.pendencia .prazo.atrasado { color: var(--erro); background: rgba(255,107,107,.12); }
+
+.ag-ate { font-size: .78rem; color: var(--fraco); }
+.ag-dia-inteiro {
+  display: flex; align-items: center; gap: .3rem;
+  font-size: .78rem; color: var(--fraco); cursor: pointer;
+}
+.ag-dia-inteiro input { accent-color: var(--acento); }
+.ag-item.pendencia-item { border-left-color: var(--acento); }

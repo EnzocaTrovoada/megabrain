@@ -83,7 +83,7 @@ function ical_gerar(array $b, array $escopo, string $host): string
     }
 
     $generico = !empty($escopo['titulos_genericos']);
-    $tipos    = $escopo['tipos'] ?? ['avaliacao', 'compromisso', 'rotina'];
+    $tipos    = $escopo['tipos'] ?? ['avaliacao', 'compromisso', 'rotina', 'pendencia'];
     $comFeriado = !empty($escopo['feriados']);
 
     $agora = gmdate('Ymd\THis\Z');
@@ -149,12 +149,14 @@ function ical_gerar(array $b, array $escopo, string $host): string
             $l[] = 'DTSTAMP:' . $agora;
 
             if (!empty($it['hora'])) {
-                $ini = $compacta . 'T' . str_replace(':', '', $it['hora']) . '00';
-                $fim = !empty($it['hora_fim'])
-                    ? $compacta . 'T' . str_replace(':', '', $it['hora_fim']) . '00'
-                    : $compacta . 'T' . str_replace(':', '', hora_mais($it['hora'], 60)) . '00';
-                $l[] = 'DTSTART:' . $ini;
-                $l[] = 'DTEND:' . $fim;
+                $l[] = 'DTSTART:' . $compacta . 'T' . str_replace(':', '', $it['hora']) . '00';
+
+                // Sem hora de fim NAO inventamos duracao. O RFC aceita DTSTART
+                // sozinho, e o calendario mostra so o horario de inicio; supor
+                // uma hora encheria a agenda de blocos que nunca existiram.
+                if (!empty($it['hora_fim'])) {
+                    $l[] = 'DTEND:' . $compacta . 'T' . str_replace(':', '', $it['hora_fim']) . '00';
+                }
             } else {
                 $l[] = 'DTSTART;VALUE=DATE:' . $compacta;
                 $l[] = 'DTEND;VALUE=DATE:' . str_replace('-', '', (new DateTimeImmutable($data))->modify('+1 day')->format('Y-m-d'));
@@ -182,12 +184,4 @@ function ical_gerar(array $b, array $escopo, string $host): string
     $l[] = 'END:VCALENDAR';
 
     return implode("\r\n", array_map('ical_dobrar', $l)) . "\r\n";
-}
-
-function hora_mais(string $hhmm, int $minutos): string
-{
-    [$h, $m] = array_map('intval', explode(':', $hhmm));
-    $t = min(23 * 60 + 59, $h * 60 + $m + $minutos);
-
-    return sprintf('%02d:%02d', intdiv($t, 60), $t % 60);
 }

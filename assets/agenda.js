@@ -189,7 +189,9 @@ window.Agenda = (function () {
 
     const hora = document.createElement('span');
     hora.className = 'ag-hora';
-    hora.textContent = it.hora || '—';
+    if (it.dia_inteiro) hora.textContent = 'dia';
+    else if (it.hora && it.hora_fim) { hora.textContent = it.hora; hora.title = it.hora + ' às ' + it.hora_fim; }
+    else hora.textContent = it.hora || '—';
     li.appendChild(hora);
 
     const meio = document.createElement('div');
@@ -207,6 +209,7 @@ window.Agenda = (function () {
     }
     if (it.local) detalhes.push(it.local);
     if (it.hora_fim) detalhes.push('até ' + it.hora_fim);
+    if (it.origem === 'pendencia') detalhes.push('em ' + it.nota);
     const nomeMat = nomeDaMateria(it.materia_id);
     if (nomeMat) detalhes.push(nomeMat);
 
@@ -264,25 +267,59 @@ window.Agenda = (function () {
     txt.placeholder = 'Adicionar ao dia…';
     txt.required = true;
 
-    const hora = document.createElement('input');
-    hora.type = 'time';
-    hora.title = 'Hora (opcional)';
+    const inicio = document.createElement('input');
+    inicio.type = 'time';
+    inicio.title = 'Início';
+
+    const ate = document.createElement('span');
+    ate.className = 'ag-ate';
+    ate.textContent = 'até';
+
+    const fim = document.createElement('input');
+    fim.type = 'time';
+    fim.title = 'Fim';
+
+    const rotDia = document.createElement('label');
+    rotDia.className = 'ag-dia-inteiro';
+    const inteiro = document.createElement('input');
+    inteiro.type = 'checkbox';
+    rotDia.append(inteiro, document.createTextNode('dia inteiro'));
+
+    // Dia inteiro e horario sao exclusivos: deixar os dois ativos ao mesmo
+    // tempo produziria um evento que se contradiz.
+    inteiro.addEventListener('change', () => {
+      [inicio, fim].forEach((c) => {
+        c.disabled = inteiro.checked;
+        if (inteiro.checked) c.value = '';
+      });
+      ate.classList.toggle('desligado', inteiro.checked);
+    });
 
     const ok = document.createElement('button');
     ok.type = 'submit';
     ok.textContent = '+';
 
-    f.append(txt, hora, ok);
+    f.append(txt, inicio, ate, fim, rotDia, ok);
 
     f.addEventListener('submit', async (ev) => {
       ev.preventDefault();
       if (!txt.value.trim()) return;
+
+      if (inicio.value && fim.value && fim.value <= inicio.value) {
+        alert('A hora de fim precisa ser depois da de início.');
+        return;
+      }
+
       await api('compromisso.salvar', {
         titulo: txt.value.trim(),
         data: selecionada,
-        hora: hora.value || null,
+        dia_inteiro: inteiro.checked,
+        hora: inteiro.checked ? null : (inicio.value || null),
+        hora_fim: inteiro.checked ? null : (fim.value || null),
       });
+
       txt.value = '';
+      inicio.value = fim.value = '';
       await carregarMes(mes);
     });
 
@@ -378,6 +415,11 @@ window.Agenda = (function () {
 
     const hora = document.createElement('input');
     hora.type = 'time';
+    hora.title = 'Início';
+
+    const horaFim = document.createElement('input');
+    horaFim.type = 'time';
+    horaFim.title = 'Fim';
 
     const tipo = document.createElement('select');
     [['pessoal', 'pessoal'], ['academica', 'aula']].forEach(([v, r]) => {
@@ -403,7 +445,7 @@ window.Agenda = (function () {
     ok.type = 'submit';
     ok.textContent = 'Criar rotina';
 
-    f.append(nome, caixaDias, hora, tipo, mat, ok);
+    f.append(nome, caixaDias, hora, horaFim, tipo, mat, ok);
 
     f.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -415,12 +457,14 @@ window.Agenda = (function () {
         tipo: tipo.value,
         dias_semana: mascara,
         hora_inicio: hora.value || null,
+        hora_fim: horaFim.value || null,
         materia_id: mat.value || null,
       });
 
       rotinas.push({
         id: r.id, titulo: nome.value.trim(), tipo: tipo.value,
-        dias_semana: mascara, hora_inicio: hora.value || null, materia_id: mat.value || null,
+        dias_semana: mascara, hora_inicio: hora.value || null,
+        hora_fim: horaFim.value || null, materia_id: mat.value || null,
       });
 
       desenharRotinas();

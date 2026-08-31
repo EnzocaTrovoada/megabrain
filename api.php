@@ -19,6 +19,7 @@ $mutacoes = [
     'rotina.salvar', 'rotina.excluir', 'rotina.excecao',
     'compromisso.salvar', 'compromisso.excluir',
     'feed.criar', 'feed.revogar',
+    'pendencia.marcar',
 ];
 if (in_array($acao, $mutacoes, true)) {
     $enviado = $_SERVER['HTTP_X_CSRF'] ?? '';
@@ -319,12 +320,18 @@ switch ($acao) {
             json_saida(['erro' => 'data_invalida'], 422);
         }
 
+        // Dia inteiro e horario sao exclusivos: com dia_inteiro ligado, guardar
+        // hora deixaria a agenda mostrando as duas coisas ao mesmo tempo.
+        $diaInteiro = !empty($d['dia_inteiro']);
+
         $registro = [
-            'titulo'     => $titulo,
-            'data'       => $data,
-            'hora'       => texto($d, 'hora', 5) ?: null,
-            'materia_id' => texto($d, 'materia_id', 24) ?: null,
-            'concluido'  => !empty($d['concluido']),
+            'titulo'      => $titulo,
+            'data'        => $data,
+            'dia_inteiro' => $diaInteiro,
+            'hora'        => $diaInteiro ? null : (texto($d, 'hora', 5) ?: null),
+            'hora_fim'    => $diaInteiro ? null : (texto($d, 'hora_fim', 5) ?: null),
+            'materia_id'  => texto($d, 'materia_id', 24) ?: null,
+            'concluido'   => !empty($d['concluido']),
         ];
 
         $achou = false;
@@ -393,8 +400,8 @@ switch ($acao) {
                 'titulos_genericos' => !empty($d['titulos_genericos']),
                 'tipos'             => array_values(array_intersect(
                     is_array($d['tipos'] ?? null) ? $d['tipos'] : [],
-                    ['avaliacao', 'compromisso', 'rotina']
-                )) ?: ['avaliacao', 'compromisso', 'rotina'],
+                    ['avaliacao', 'compromisso', 'rotina', 'pendencia']
+                )) ?: ['avaliacao', 'compromisso', 'rotina', 'pendencia'],
             ],
         ];
 
@@ -425,6 +432,51 @@ switch ($acao) {
         }
 
         json_saida(['ok' => escrever_json(caminho('feeds.json'), $feeds)]);
+
+        // no break
+
+    case 'pendencias':
+        require_once __DIR__ . '/app/pendencias.php';
+
+        json_saida([
+            'pendencias' => pendencias($b),
+            'materias'   => array_values($b['materias']),
+        ]);
+
+        // no break
+
+    case 'pendencia.marcar':
+        require_once __DIR__ . '/app/pendencias.php';
+
+        $d      = corpo();
+        $notaId = texto($d, 'nota_id', 24);
+        $linha  = (int) ($d['linha'] ?? -1);
+        $bruto  = (string) ($d['bruto'] ?? '');
+        $feita  = !empty($d['feita']);
+
+        $ok = false;
+        foreach ($b['anotacoes'] as $i => $n) {
+            if (($n['id'] ?? '') !== $notaId) {
+                continue;
+            }
+
+            $novo = marcar_tarefa((string) ($n['conteudo'] ?? ''), $linha, $bruto, $feita);
+            if ($novo === null) {
+                // A nota mudou desde que a tela carregou: marcar a linha errada
+                // seria pior do que nao marcar nada.
+                json_saida(['erro' => 'nota_mudou'], 409);
+            }
+
+            $b['anotacoes'][$i]['conteudo']      = $novo;
+            $b['anotacoes'][$i]['atualizado_em'] = agora();
+            $ok = true;
+        }
+
+        if (!$ok) {
+            json_saida(['erro' => 'nao_encontrada'], 404);
+        }
+
+        json_saida(['ok' => salvar_base($b)]);
 
         // no break
 

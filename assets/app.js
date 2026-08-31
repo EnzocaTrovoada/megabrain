@@ -320,6 +320,8 @@ async function salvarJa() {
     notaAberta.materia_id = payload.materia_id;
     marcar('salvo', 'salvo');
     await carregar(true);
+    // O texto salvo pode ter criado ou concluído uma caixa "- [ ]".
+    if (typeof carregarPendencias === 'function') carregarPendencias();
   } catch (e) {
     sujo = true;
     marcar('falhou', 'sem conexão');
@@ -740,3 +742,98 @@ document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && Agenda.aberto()) Agenda.fechar();
   if ((ev.metaKey || ev.ctrlKey) && ev.key === 'j') { ev.preventDefault(); abrirAgenda(); }
 });
+
+// ------------------------------------------------------- pendências
+
+/**
+ * As caixas "- [ ]" espalhadas pelas anotações, reunidas num lugar só.
+ *
+ * Não há lista de tarefas separada de propósito: a tarefa nasce dentro da
+ * anotação da aula, no contexto dela. Marcar aqui reescreve o "[ ]" na nota —
+ * a anotação continua sendo a fonte da verdade, não um registro paralelo.
+ *
+ *   - [ ] revisar Krebs
+ *   - [ ] ! entregar relatório        (o ! marca urgente)
+ *   - [ ] ! prova @2026-09-10         (o @data joga na agenda)
+ */
+let pendencias = [];
+
+async function carregarPendencias() {
+  try {
+    const r = await api('pendencias');
+    pendencias = r.pendencias || [];
+  } catch (e) {
+    pendencias = [];
+  }
+  desenharPendencias();
+}
+
+function desenharPendencias(todas) {
+  const ul = document.getElementById('pendencias');
+  ul.textContent = '';
+
+  const lista = todas ? pendencias : pendencias.slice(0, 6);
+
+  if (lista.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'nenhum';
+    li.textContent = 'Nada pendente.';
+    ul.appendChild(li);
+    return;
+  }
+
+  const hojeStr = new Date().toISOString().slice(0, 10);
+
+  lista.forEach((p) => {
+    const li = document.createElement('li');
+    li.className = 'pendencia';
+    if (p.urgente) li.classList.add('urgente');
+
+    const cx = document.createElement('input');
+    cx.type = 'checkbox';
+    cx.title = 'Concluir';
+    cx.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      try {
+        await api('pendencia.marcar', {
+          nota_id: p.nota_id, linha: p.linha, bruto: p.bruto, feita: true,
+        });
+      } catch (e) {
+        // 409: a nota mudou desde que a lista carregou.
+        marcar('falhou', 'nota mudou');
+      }
+      await carregarPendencias();
+      if (notaAberta && notaAberta.id === p.nota_id) await abrir(p.nota_id);
+    });
+    li.appendChild(cx);
+
+    const rot = document.createElement('span');
+    rot.className = 'rotulo';
+    rot.textContent = p.texto;
+    li.appendChild(rot);
+
+    if (p.prazo) {
+      const pz = document.createElement('span');
+      pz.className = 'prazo';
+      if (p.prazo < hojeStr) pz.classList.add('atrasado');
+      pz.textContent = p.prazo.slice(8) + '/' + p.prazo.slice(5, 7);
+      li.appendChild(pz);
+    }
+
+    li.title = 'em ' + p.nota;
+    li.addEventListener('click', () => abrir(p.nota_id));
+    ul.appendChild(li);
+  });
+
+  if (!todas && pendencias.length > lista.length) {
+    const li = document.createElement('li');
+    li.className = 'nenhum';
+    li.textContent = '+ ' + (pendencias.length - lista.length) + ' pendentes';
+    li.addEventListener('click', () => desenharPendencias(true));
+    ul.appendChild(li);
+  }
+}
+
+document.getElementById('ver-pendencias').addEventListener('click', () => desenharPendencias(true));
+
+carregarPendencias();

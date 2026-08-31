@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/feriados.php';
+require_once __DIR__ . '/pendencias.php';
 
 /**
  * Monta a agenda de um intervalo de datas.
@@ -59,6 +60,7 @@ function agenda_entre(array $b, string $de, string $ate): array
     }
 
     $avaliacoes = avaliacoes_por_data($b);
+    $pendencias = pendencias_por_data($b);
 
     $dias = [];
     for ($d = $inicio; $d <= $fim; $d = $d->modify('+1 day')) {
@@ -103,13 +105,19 @@ function agenda_entre(array $b, string $de, string $ate): array
 
         foreach ($porData[$data] ?? [] as $c) {
             $itens[] = [
-                'origem'     => 'compromisso',
-                'ref'        => $c['id'] ?? null,
-                'titulo'     => $c['titulo'] ?? '',
-                'hora'       => $c['hora'] ?? null,
-                'materia_id' => $c['materia_id'] ?? null,
-                'concluido'  => !empty($c['concluido']),
+                'origem'      => 'compromisso',
+                'ref'         => $c['id'] ?? null,
+                'titulo'      => $c['titulo'] ?? '',
+                'hora'        => $c['hora'] ?? null,
+                'hora_fim'    => $c['hora_fim'] ?? null,
+                'dia_inteiro' => !empty($c['dia_inteiro']),
+                'materia_id'  => $c['materia_id'] ?? null,
+                'concluido'   => !empty($c['concluido']),
             ];
+        }
+
+        foreach ($pendencias[$data] ?? [] as $p) {
+            $itens[] = $p;
         }
 
         foreach ($avaliacoes[$data] ?? [] as $a) {

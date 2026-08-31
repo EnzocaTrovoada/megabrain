@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Sobe a cada mudança em CSS/JS: o LiteSpeed cacheia estático por dias e sem
 // isto você continuaria vendo a versão velha depois do upload.
-$versao = '7';
+$versao = '8';
 
 // Ícone do site. Procura o PNG nos dois lugares onde ele costuma ser largado e
 // cai no SVG do repositório se não achar nenhum — assim reenviar o index.php
@@ -145,6 +145,11 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
       <div class="secao">
         <div class="secao-topo"><span>Matérias</span><button id="nova-materia" title="Nova matéria">+</button></div>
         <ul id="materias"></ul>
+      </div>
+
+      <div class="secao">
+        <div class="secao-topo"><span>Pendências</span><button id="ver-pendencias" title="Ver todas">↗</button></div>
+        <ul id="pendencias"></ul>
       </div>
 
       <div class="secao cresce">
