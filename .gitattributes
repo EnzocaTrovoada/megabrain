@@ -1,0 +1,8 @@
+# O servidor é Linux. Guardar tudo com LF evita que a conversão automática do
+# Windows mande CRLF para lá num deploy por git.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary

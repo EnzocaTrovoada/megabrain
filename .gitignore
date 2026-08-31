@@ -1,0 +1,20 @@
+# NUNCA versionar: é a pasta com hash da senha, sessões ativas, todas as suas
+# anotações e as imagens que você enviou. Ela é criada pelo PHP no servidor.
+dados/
+public_html/dados/
+
+# Sobras de escrita atômica
+*.tmp
+.tmp-*
+
+# Arquivos de teste gerados na máquina
+teste.png
+
+# Lixo de sistema e editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
