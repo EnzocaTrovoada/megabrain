@@ -40,7 +40,7 @@ Nos dois casos, uma vez só:
 2. Apague `bin/diagnostico.php` do servidor: ele expõe caminho absoluto,
    versão do PHP e extensões.
 3. Abra o domínio. Aparece a tela de instalação, pedindo um código.
-5. O código está em `dados/CODIGO-DE-INSTALACAO.txt`, gerado pelo servidor na
+4. O código está em `dados/CODIGO-DE-INSTALACAO.txt`, gerado pelo servidor na
    primeira visita. Abra pelo Gerenciador de Arquivos da Hostinger, informe o
    código e escolha sua senha.
 
@@ -129,7 +129,7 @@ sanitizador, sem a dependência.
 | Atalho | O quê |
 |---|---|
 | `Ctrl/Cmd + S` | salvar agora |
-| `Ctrl/Cmd + E` | alternar ler / escrever |
+| `Ctrl/Cmd + E` | cicla escrever / dividido / ler |
 | `Ctrl/Cmd + K` | ir para a busca |
 | `Ctrl/Cmd + G` | abrir o mapa mental |
 | `Ctrl/Cmd + V` | cola imagem, que sobe sozinha |
