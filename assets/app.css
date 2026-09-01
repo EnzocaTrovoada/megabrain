@@ -611,3 +611,18 @@ code { font-family: var(--mono); font-size: .9em; }
   .paleta { padding: 6vh .6rem .6rem; }
   .paleta-rodape { display: none; }
 }
+
+.lateral li .x.estrela.on { opacity: 1; color: #f59e0b; }
+.lateral li .x.estrela { font-size: .85rem; }
+
+#ordem-notas {
+  background: none; border: 0; color: var(--fraco);
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .05em;
+  outline: none; cursor: pointer; margin-left: auto; margin-right: .3rem;
+}
+#ordem-notas option { background: var(--painel); text-transform: none; letter-spacing: 0; }
+
+.contador {
+  padding: .35rem .9rem; border-top: 1px solid var(--linha);
+  font-size: .72rem; color: var(--fraco); text-align: right;
+}

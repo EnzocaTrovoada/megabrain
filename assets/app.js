@@ -118,6 +118,25 @@ function item(texto, opcoes) {
   rot.textContent = texto;
   li.appendChild(rot);
 
+  if (opcoes.aoFavoritar) {
+    const f = document.createElement('button');
+    f.className = 'x estrela';
+    f.textContent = opcoes.favorita ? '★' : '☆';
+    f.title = opcoes.favorita ? 'Desafixar' : 'Fixar no topo';
+    if (opcoes.favorita) f.classList.add('on');
+    f.addEventListener('click', (ev) => { ev.stopPropagation(); opcoes.aoFavoritar(); });
+    li.appendChild(f);
+  }
+
+  if (opcoes.aoDuplicar) {
+    const c = document.createElement('button');
+    c.className = 'x';
+    c.textContent = '⧉';
+    c.title = 'Duplicar';
+    c.addEventListener('click', (ev) => { ev.stopPropagation(); opcoes.aoDuplicar(); });
+    li.appendChild(c);
+  }
+
   if (opcoes.aoEditar) {
     const e = document.createElement('button');
     e.className = 'x';
@@ -176,13 +195,30 @@ function desenharEspacos() {
   });
 }
 
-function notasVisiveis() {
-  const q = el.busca.value.trim().toLowerCase();
+/** Ordem escolhida pelo usuário; favorita sempre vem antes, em qualquer ordem. */
+let ordem = recuperar('mb_ordem') || 'recentes';
 
-  return estado.anotacoes
+function semAcento(t) {
+  return (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function notasVisiveis() {
+  const q = semAcento(el.busca.value.trim());
+
+  const lista = estado.anotacoes
     .filter((n) => espacoAtivo === null || n.espaco_id === espacoAtivo)
-    .filter((n) => q === '' || (n.titulo || '').toLowerCase().includes(q))
-    .sort((a, b) => (b.atualizado_em || '').localeCompare(a.atualizado_em || ''));
+    .filter((n) => q === '' || semAcento(n.titulo || '').includes(q));
+
+  const porOrdem = {
+    recentes: (a, b) => (b.atualizado_em || '').localeCompare(a.atualizado_em || ''),
+    alfabetica: (a, b) => (a.titulo || '').localeCompare(b.titulo || '', 'pt-BR'),
+    antigas: (a, b) => (a.criado_em || '').localeCompare(b.criado_em || ''),
+  };
+
+  return lista.sort((a, b) => {
+    if (!!a.favorita !== !!b.favorita) return a.favorita ? -1 : 1;
+    return (porOrdem[ordem] || porOrdem.recentes)(a, b);
+  });
 }
 
 function desenharNotas() {
@@ -205,7 +241,17 @@ function desenharNotas() {
     el.notas.appendChild(item(n.titulo || 'Sem título', {
       cor: n.espaco_id ? corDoEspaco(n.espaco_id) : null,
       ativa: notaAberta && notaAberta.id === n.id,
+      favorita: n.favorita,
       aoClicar: () => abrir(n.id),
+      aoFavoritar: async () => {
+        await api('nota.favoritar', { id: n.id, favorita: !n.favorita });
+        await carregar();
+      },
+      aoDuplicar: async () => {
+        const r = await api('nota.duplicar', { id: n.id });
+        await carregar();
+        await abrir(r.id);
+      },
       aoExcluir: async () => {
         if (!confirm('Excluir "' + (n.titulo || 'Sem título') + '"?')) return;
         await api('nota.excluir', { id: n.id });
@@ -274,6 +320,7 @@ function aplicar(n) {
   sujo = false;
   marcar('', '');
   desenharBacklinks(n.backlinks || []);
+  atualizarContador();
   // Trocar de nota no modo leitura mantém o modo, mas o conteúdo é outro.
   if (modo !== 'escrever') renderizarPreview();
   desenhar();
@@ -1035,3 +1082,37 @@ document.addEventListener('keydown', (ev) => {
 });
 
 carregarHoje();
+
+// ------------------------------------------------------- lista de notas
+
+document.getElementById('ordem-notas').addEventListener('change', (ev) => {
+  ordem = ev.target.value;
+  guardar('mb_ordem', ordem);
+  desenharNotas();
+});
+document.getElementById('ordem-notas').value = ordem;
+
+/**
+ * Contagem de palavras e tempo de leitura.
+ *
+ * 200 palavras por minuto é a média para leitura de estudo — mais devagar que
+ * as 250 que se usa para texto corrido, porque anotação se relê pensando.
+ */
+function atualizarContador() {
+  const cx = document.getElementById('contador');
+
+  if (!notaAberta) {
+    cx.classList.add('oculto');
+    return;
+  }
+
+  const texto = el.editor.value.trim();
+  const palavras = texto ? (texto.match(/\S+/g) || []).length : 0;
+  const minutos = Math.max(1, Math.round(palavras / 200));
+
+  cx.classList.toggle('oculto', palavras === 0);
+  cx.textContent = palavras + (palavras === 1 ? ' palavra' : ' palavras')
+    + (palavras > 60 ? ' · ' + minutos + ' min de leitura' : '');
+}
+
+el.editor.addEventListener('input', atualizarContador);

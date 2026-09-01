@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 
 const ARQUIVO_CODIGO_SETUP = 'CODIGO-DE-INSTALACAO.txt';
+const USUARIO_PADRAO       = 'principal';
 
 // A Hostinger vem com display_errors ligado. Stack trace na tela vaza caminho
 // absoluto do servidor e trecho de código: erro vai pro log, nunca pro navegador.
@@ -64,6 +65,65 @@ function dados_fora_do_publico(): bool
 function caminho(string $rel): string
 {
     return raiz_dados() . '/' . ltrim($rel, '/');
+}
+
+/**
+ * Quem esta logado. Hoje sempre "principal": ha uma senha so.
+ *
+ * Existe agora, com um usuario so, porque separar dados DEPOIS de o sistema
+ * ter conteudo seria migrar arquivo com anotacao dentro. Com a pasta por
+ * usuario desde ja, abrir para outras pessoas vira acrescentar uma linha em
+ * usuarios.json, nao reorganizar o disco.
+ */
+function usuario_atual(): string
+{
+    $s = sessao_atual();
+    $u = $s['usuario_id'] ?? USUARIO_PADRAO;
+
+    // O id vem do disco, mas vira caminho de pasta: so aceita o que e seguro.
+    return preg_match('/^[a-z0-9_-]{1,32}$/', (string) $u) ? (string) $u : USUARIO_PADRAO;
+}
+
+/** Arquivo que pertence a UM usuario: base, arquivos enviados, feeds. */
+function caminho_usuario(string $rel, ?string $uid = null): string
+{
+    $dir = raiz_dados() . '/usuarios/' . ($uid ?? usuario_atual());
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0700, true);
+    }
+
+    return $dir . '/' . ltrim($rel, '/');
+}
+
+/**
+ * Move os arquivos do usuario unico para dentro da pasta dele.
+ *
+ * Roda uma vez, na primeira leitura depois da atualizacao. Enquanto nao houver
+ * dados/base.json solto na raiz, nao faz nada.
+ */
+function migrar_para_usuarios(): void
+{
+    $solto = caminho('base.json');
+    if (!is_file($solto)) {
+        return;
+    }
+
+    $destino = raiz_dados() . '/usuarios/' . USUARIO_PADRAO;
+    if (!is_dir($destino)) {
+        @mkdir($destino, 0700, true);
+    }
+
+    foreach (['base.json', 'arquivos.json', 'feeds.json'] as $arq) {
+        $de = caminho($arq);
+        if (is_file($de) && !is_file($destino . '/' . $arq)) {
+            @rename($de, $destino . '/' . $arq);
+        }
+    }
+
+    $pastaArquivos = caminho('arquivos');
+    if (is_dir($pastaArquivos) && !is_dir($destino . '/arquivos')) {
+        @rename($pastaArquivos, $destino . '/arquivos');
+    }
 }
 
 // ------------------------------------------------------------------ json
@@ -256,6 +316,7 @@ function criar_sessao(): void
     }
 
     $todas[hash('sha256', $token)] = [
+        'usuario_id' => USUARIO_PADRAO,
         'expira'   => time() + SESSAO_DIAS * 86400,
         'absoluto' => time() + 90 * 86400,
         'csrf'     => bin2hex(random_bytes(16)),
@@ -374,17 +435,24 @@ function migrar_base(array $b): array
     return $b;
 }
 
-function base(): array
+function base_de(string $uid): array
+{
+    return base(preg_match('/^[a-z0-9_-]{1,32}$/', $uid) ? $uid : USUARIO_PADRAO);
+}
+
+function base(?string $uid = null): array
 {
     // As colecoes sao completadas na leitura porque um base.json gravado por
     // versao anterior nao tem as chaves novas. Sem isto, quem ja usa o app
     // quebraria justamente ao atualizar.
-    $b = ler_json(caminho('base.json'), []);
+    migrar_para_usuarios();
+
+    $b = ler_json(caminho_usuario('base.json', $uid), []);
 
     $antes = $b['versao'] ?? 1;
     $b     = migrar_base($b);
     if ($antes !== ($b['versao'] ?? 1)) {
-        escrever_json(caminho('base.json'), $b);
+        escrever_json(caminho_usuario('base.json', $uid), $b);
     }
 
     return $b + [
@@ -401,7 +469,7 @@ function salvar_base(array $b): bool
 {
     $b['versao'] = 2;
 
-    return escrever_json(caminho('base.json'), $b);
+    return escrever_json(caminho_usuario('base.json'), $b);
 }
 
 function novo_id(): string
@@ -430,7 +498,7 @@ const MIMES_ACEITOS = [
 
 function pasta_arquivos(): string
 {
-    $p = caminho('arquivos');
+    $p = caminho_usuario('arquivos');
     if (!is_dir($p)) {
         @mkdir($p, 0700, true);
     }
@@ -452,12 +520,12 @@ function caminho_arquivo(string $hash, string $ext, bool $miniatura = false): st
 
 function indice_arquivos(): array
 {
-    return ler_json(caminho('arquivos.json'), []);
+    return ler_json(caminho_usuario('arquivos.json'), []);
 }
 
 function salvar_indice_arquivos(array $i): bool
 {
-    return escrever_json(caminho('arquivos.json'), $i);
+    return escrever_json(caminho_usuario('arquivos.json'), $i);
 }
 
 function bytes_usados(): int
@@ -505,7 +573,7 @@ function reencodar_imagem(string $origem, string $mime, int $ladoMax): ?array
         }
     }
 
-    $tmp = caminho('.tmp-' . bin2hex(random_bytes(6)));
+    $tmp = caminho_usuario('.tmp-' . bin2hex(random_bytes(6)));
 
     // PNG e WEBP mantêm transparência; JPEG não tem alfa para preservar.
     if ($mime === 'image/jpeg') {

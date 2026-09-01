@@ -44,7 +44,9 @@ if (($agoraTs - (int) ($feed['ultimo_acesso_ts'] ?? 0)) > 3600) {
     escrever_json(caminho('feeds.json'), $feeds);
 }
 
-$ics = ical_gerar(base(), $feed['escopo'] ?? [], (string) ($_SERVER['HTTP_HOST'] ?? 'megabrain'));
+// Sem sessao aqui: quem diz de quem e a agenda e o proprio token.
+$dono = $feed['usuario_id'] ?? USUARIO_PADRAO;
+$ics  = ical_gerar(base_de($dono), $feed['escopo'] ?? [], (string) ($_SERVER['HTTP_HOST'] ?? 'megabrain'));
 
 header('Content-Type: text/calendar; charset=utf-8');
 header('Content-Disposition: inline; filename="megabrain.ics"');

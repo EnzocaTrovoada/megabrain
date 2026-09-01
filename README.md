@@ -30,12 +30,20 @@ src/Servico/            núcleo de cálculo de média (ainda sem tela)
 testes/ e bin/          testes do cálculo — bloqueados por .htaccess
 
 ../dados/               criado sozinho, UM NÍVEL ACIMA — fora do público
-  config.json           hash da sua senha
-  base.json             matérias e anotações
-  arquivos/             imagens enviadas
+  config.json           hash da senha
   sessoes.json          sessões ativas
   tentativas.json       controle de força bruta
+  feeds.json            feeds iCal (global: ical.php responde sem sessão)
+  usuarios/
+    principal/          tudo que pertence a UMA pessoa
+      base.json         espaços, anotações, rotinas, compromissos
+      arquivos.json     índice das imagens
+      arquivos/         as imagens
 ```
+
+A pasta por usuário existe desde já, com um usuário só. Separar dados **depois**
+de o sistema ter conteúdo seria migrar arquivo com anotação dentro; assim, abrir
+para outras pessoas vira acrescentar uma linha, não reorganizar o disco.
 
 ## Subir na Hostinger
 

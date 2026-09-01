@@ -20,6 +20,7 @@ $mutacoes = [
     'compromisso.salvar', 'compromisso.excluir',
     'feed.criar', 'feed.revogar',
     'pendencia.marcar',
+    'nota.favoritar', 'nota.duplicar',
 ];
 if (in_array($acao, $mutacoes, true)) {
     $enviado = $_SERVER['HTTP_X_CSRF'] ?? '';
@@ -63,7 +64,9 @@ switch ($acao) {
             'anotacoes' => array_values(array_map(
                 // A lista não precisa do corpo das notas; só o editor precisa.
                 static fn (array $n): array => array_diff_key($n, ['conteudo' => 1]) + [
-                    'tamanho' => mb_strlen((string) ($n['conteudo'] ?? '')),
+                    'tamanho'  => mb_strlen((string) ($n['conteudo'] ?? '')),
+                    'palavras' => str_word_count(strip_tags((string) ($n['conteudo'] ?? '')), 0, 'áàãâéêíóôõúüçÁÀÃÂÉÊÍÓÔÕÚÜÇ0123456789'),
+                    'favorita' => !empty($n['favorita']),
                 ],
                 array_filter($b['anotacoes'], static fn ($n) => empty($n['excluida_em']))
             )),
@@ -366,7 +369,7 @@ switch ($acao) {
     case 'feed.listar':
         $lista = [];
         foreach (ler_json(caminho('feeds.json'), []) as $f) {
-            if (!empty($f['revogado_em'])) {
+            if (!empty($f['revogado_em']) || ($f['usuario_id'] ?? USUARIO_PADRAO) !== usuario_atual()) {
                 continue;
             }
             // O token nunca volta: so existe em claro no instante da criacao.
@@ -393,6 +396,9 @@ switch ($acao) {
 
         $feeds[hash('sha256', $token)] = [
             'id'        => $id,
+            // O indice de feeds e global porque ical.php responde sem sessao e
+            // precisa descobrir de quem e o feed so pelo token.
+            'usuario_id' => usuario_atual(),
             'nome'      => texto($d, 'nome', 60) ?: 'Celular',
             'criado_em' => agora(),
             'escopo'    => [
@@ -424,7 +430,7 @@ switch ($acao) {
         $feeds = ler_json(caminho('feeds.json'), []);
 
         foreach ($feeds as $k => $f) {
-            if (($f['id'] ?? '') === $id) {
+            if (($f['id'] ?? '') === $id && ($f['usuario_id'] ?? USUARIO_PADRAO) === usuario_atual()) {
                 // Marcado em vez de apagado: o registro de acessos e a prova de
                 // que o link vazado parou de responder.
                 $feeds[$k]['revogado_em'] = agora();
@@ -498,6 +504,49 @@ switch ($acao) {
         }
 
         json_saida(resumo_de_hoje($b, $dia));
+
+        // no break
+
+    case 'nota.favoritar':
+        $d  = corpo();
+        $id = texto($d, 'id', 24);
+
+        foreach ($b['anotacoes'] as $i => $n) {
+            if (($n['id'] ?? '') === $id) {
+                $b['anotacoes'][$i]['favorita'] = !empty($d['favorita']);
+            }
+        }
+
+        json_saida(['ok' => salvar_base($b)]);
+
+        // no break
+
+    case 'nota.duplicar':
+        $id = texto(corpo(), 'id', 24);
+
+        $copia = null;
+        foreach ($b['anotacoes'] as $n) {
+            if (($n['id'] ?? '') === $id && empty($n['excluida_em'])) {
+                $copia = $n;
+            }
+        }
+        if ($copia === null) {
+            json_saida(['erro' => 'nao_encontrada'], 404);
+        }
+
+        $novoId = novo_id();
+        $b['anotacoes'][] = array_merge($copia, [
+            'id'            => $novoId,
+            // Sem "(copia)" no titulo o duplicado vira sosia do original na
+            // lista, e os wikilinks passam a apontar para os dois.
+            'titulo'        => mb_substr(($copia['titulo'] ?: 'Sem titulo') . ' (copia)', 0, 200),
+            'favorita'      => false,
+            'criado_em'     => agora(),
+            'atualizado_em' => agora(),
+            'excluida_em'   => null,
+        ]);
+
+        json_saida(salvar_base($b) ? ['ok' => true, 'id' => $novoId] : ['erro' => 'escrita']);
 
         // no break
 
@@ -664,6 +713,9 @@ switch ($acao) {
                 $b['anotacoes'][$i]['conteudo']      = $conteudo;
                 $b['anotacoes'][$i]['espaco_id']     = $espaco;
                 $b['anotacoes'][$i]['atualizado_em'] = agora();
+                if (array_key_exists('favorita', $d)) {
+                    $b['anotacoes'][$i]['favorita'] = !empty($d['favorita']);
+                }
                 $achou = true;
             }
         }
