@@ -142,7 +142,8 @@ sanitizador, sem a dependência.
 |---|---|
 | `Ctrl/Cmd + S` | salvar agora |
 | `Ctrl/Cmd + E` | cicla escrever / dividido / ler |
-| `Ctrl/Cmd + K` | ir para a busca |
+| `Ctrl/Cmd + K` | paleta: busca tudo, inclusive dentro das notas |
+| `Ctrl/Cmd + H` | tela Hoje |
 | `Ctrl/Cmd + G` | abrir o mapa mental |
 | `Ctrl/Cmd + V` | cola imagem, que sobe sozinha |
 | `[[` no editor | sugere notas para linkar |

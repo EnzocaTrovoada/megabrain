@@ -480,6 +480,27 @@ switch ($acao) {
 
         // no break
 
+    case 'buscar':
+        require_once __DIR__ . '/app/busca.php';
+
+        json_saida(buscar($b, texto($_GET, 'q', 120)));
+
+        // no break
+
+    case 'hoje':
+        require_once __DIR__ . '/app/busca.php';
+
+        $dia = texto($_GET, 'data', 10);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dia)) {
+            // O cliente manda a data dele: o servidor em UTC ja virou o dia
+            // enquanto no Brasil ainda e ontem a noite.
+            $dia = gmdate('Y-m-d');
+        }
+
+        json_saida(resumo_de_hoje($b, $dia));
+
+        // no break
+
     case 'grafo':
         $vivas = array_values(array_filter(
             $b['anotacoes'],

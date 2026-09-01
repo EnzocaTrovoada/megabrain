@@ -423,7 +423,6 @@ el.titulo.addEventListener('blur', salvarJa);
 
 document.addEventListener('keydown', (ev) => {
   if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') { ev.preventDefault(); salvarJa(); }
-  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'k') { ev.preventDefault(); el.busca.focus(); el.busca.select(); }
   if ((ev.metaKey || ev.ctrlKey) && ev.key === 'e') { ev.preventDefault(); proximoModo(); }
 });
 
@@ -864,3 +863,175 @@ function desenharPendencias(todas) {
 document.getElementById('ver-pendencias').addEventListener('click', () => desenharPendencias(true));
 
 carregarPendencias();
+
+// ------------------------------------------------------------- hoje
+
+/**
+ * Tela Hoje: o que orienta ao abrir. Ocupa o lugar do antigo estado vazio,
+ * porque "nenhuma anotação aberta" não é informação — é a ausência dela.
+ *
+ * A data vai do cliente para o servidor de propósito: o servidor roda em UTC
+ * e já virou o dia enquanto no Brasil ainda é ontem à noite.
+ */
+async function carregarHoje() {
+  const alvo = document.getElementById('vazio');
+  if (notaAberta) return;
+
+  const agora = new Date();
+  const dataLocal = agora.getFullYear() + '-'
+    + String(agora.getMonth() + 1).padStart(2, '0') + '-'
+    + String(agora.getDate()).padStart(2, '0');
+
+  let r;
+  try {
+    r = await api('hoje', null, { data: dataLocal });
+  } catch (e) {
+    alvo.textContent = 'Sem conexão.';
+    return;
+  }
+
+  const espacoNome = (id) => {
+    const e = (r.espacos || []).find((x) => x.id === id);
+    return e ? e.nome : null;
+  };
+
+  alvo.textContent = '';
+
+  const cab = document.createElement('header');
+  const h = document.createElement('h2');
+  const d = new Date(r.data + 'T12:00:00');
+  h.textContent = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira',
+                   'quinta-feira', 'sexta-feira', 'sábado'][d.getDay()];
+  cab.appendChild(h);
+
+  const sub = document.createElement('span');
+  sub.className = 'hoje-data';
+  sub.textContent = d.getDate() + ' de ' + ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][d.getMonth()];
+  cab.appendChild(sub);
+  alvo.appendChild(cab);
+
+  if (r.feriados) {
+    const f = document.createElement('div');
+    f.className = 'ag-feriado';
+    f.textContent = r.feriados.map((x) => x.nome).join(' · ');
+    alvo.appendChild(f);
+  }
+
+  bloco('No dia', r.itens, (it) => {
+    const partes = [];
+    if (it.hora) partes.push(it.hora + (it.hora_fim ? '–' + it.hora_fim : ''));
+    else if (it.dia_inteiro) partes.push('dia');
+    partes.push(it.titulo);
+    const extra = [];
+    if (it.origem === 'avaliacao' && !it.lancada) extra.push('vale ' + it.peso_media + '% da média');
+    if (it.local) extra.push(it.local);
+    const nome = espacoNome(it.espaco_id);
+    if (nome) extra.push(nome);
+    return { texto: partes.join('  '), detalhe: extra.join(' · '), classe: it.origem };
+  }, 'Nada marcado hoje.');
+
+  bloco('Precisa de atenção', r.urgentes, (p) => ({
+    texto: p.texto,
+    detalhe: (p.atrasada ? 'atrasada · ' : '') + 'em ' + p.nota,
+    classe: p.atrasada ? 'atrasada' : 'urgente',
+    aoClicar: () => abrir(p.nota_id),
+  }), null);
+
+  bloco('Vem aí', r.proximas, (a) => ({
+    texto: a.titulo,
+    detalhe: (a.faltam === 1 ? 'amanhã' : 'em ' + a.faltam + ' dias')
+      + ' · vale ' + a.peso_media + '% da média'
+      + (espacoNome(a.espaco_id) ? ' · ' + espacoNome(a.espaco_id) : ''),
+    classe: 'avaliacao',
+  }), null);
+
+  bloco('Onde você estava', r.recentes, (n) => ({
+    texto: n.titulo,
+    detalhe: espacoNome(n.espaco_id) || '',
+    aoClicar: () => abrir(n.id),
+  }), null);
+
+  function bloco(titulo, lista, mapear, vazio) {
+    if ((!lista || lista.length === 0) && !vazio) return;
+
+    const sec = document.createElement('section');
+    sec.className = 'hoje-bloco';
+
+    const t = document.createElement('h3');
+    t.textContent = titulo;
+    sec.appendChild(t);
+
+    const ul = document.createElement('ul');
+
+    if (!lista || lista.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'hoje-vazio';
+      li.textContent = vazio;
+      ul.appendChild(li);
+    }
+
+    (lista || []).forEach((x) => {
+      const m = mapear(x);
+      const li = document.createElement('li');
+      if (m.classe) li.classList.add(m.classe);
+
+      const a = document.createElement('span');
+      a.className = 'hoje-texto';
+      a.textContent = m.texto;
+      li.appendChild(a);
+
+      if (m.detalhe) {
+        const b = document.createElement('span');
+        b.className = 'hoje-detalhe';
+        b.textContent = m.detalhe;
+        li.appendChild(b);
+      }
+
+      if (m.aoClicar) {
+        li.classList.add('clicavel');
+        li.addEventListener('click', m.aoClicar);
+      }
+
+      ul.appendChild(li);
+    });
+
+    sec.appendChild(ul);
+    alvo.appendChild(sec);
+  }
+}
+
+function irParaHoje() {
+  fechar();
+  carregarHoje();
+}
+
+document.getElementById('abrir-hoje').addEventListener('click', irParaHoje);
+
+// ------------------------------------------------------------ paleta
+
+Paleta.iniciar({
+  api: api,
+  acoes: [
+    { rotulo: 'Hoje', atalho: 'Ctrl+H', executar: irParaHoje },
+    { rotulo: 'Agenda', atalho: 'Ctrl+J', executar: abrirAgenda },
+    { rotulo: 'Mapa mental', atalho: 'Ctrl+G', executar: abrirGrafo },
+    { rotulo: 'Nova anotação', executar: () => document.getElementById('nova-nota').click() },
+    { rotulo: 'Novo espaço', executar: () => document.getElementById('novo-espaco').click() },
+  ],
+  aoEscolher: async (alvo) => {
+    if (alvo.tipo === 'nota') return abrir(alvo.id);
+    if (alvo.tipo === 'espaco') { espacoAtivo = alvo.id; fechar(); desenhar(); carregarHoje(); }
+  },
+});
+
+document.addEventListener('keydown', (ev) => {
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'h') { ev.preventDefault(); irParaHoje(); }
+  // Ctrl+K abre a paleta; o filtro da barra lateral continua no campo dele.
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'k') {
+    ev.preventDefault();
+    Paleta.aberta() ? Paleta.fechar() : Paleta.abrir();
+  }
+});
+
+carregarHoje();
