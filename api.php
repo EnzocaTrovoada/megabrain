@@ -21,6 +21,7 @@ $mutacoes = [
     'feed.criar', 'feed.revogar',
     'pendencia.marcar',
     'nota.favoritar', 'nota.duplicar',
+    'captura.criar', 'captura.revogar',
 ];
 if (in_array($acao, $mutacoes, true)) {
     $enviado = $_SERVER['HTTP_X_CSRF'] ?? '';
@@ -547,6 +548,65 @@ switch ($acao) {
         ]);
 
         json_saida(salvar_base($b) ? ['ok' => true, 'id' => $novoId] : ['erro' => 'escrita']);
+
+        // no break
+
+    case 'captura.listar':
+        $lista = [];
+        foreach (ler_json(caminho('capturas.json'), []) as $c) {
+            if (!empty($c['revogado_em']) || ($c['usuario_id'] ?? USUARIO_PADRAO) !== usuario_atual()) {
+                continue;
+            }
+            $lista[] = [
+                'id'     => $c['id'] ?? '',
+                'nome'   => $c['nome'] ?? '',
+                'total'  => (int) ($c['total'] ?? 0),
+                'ultimo' => $c['ultimo'] ?? null,
+            ];
+        }
+
+        json_saida(['capturas' => $lista]);
+
+        // no break
+
+    case 'captura.criar':
+        $d     = corpo();
+        $token = bin2hex(random_bytes(32));
+        $id    = novo_id();
+
+        $capturas = ler_json(caminho('capturas.json'), []);
+        $capturas[hash('sha256', $token)] = [
+            'id'         => $id,
+            'usuario_id' => usuario_atual(),
+            'nome'       => texto($d, 'nome', 60) ?: 'iPhone',
+            'espaco_id'  => texto($d, 'espaco_id', 24) ?: null,
+            'criado_em'  => agora(),
+            'total'      => 0,
+            'batidas'    => [],
+        ];
+
+        if (!escrever_json(caminho('capturas.json'), $capturas)) {
+            json_saida(['erro' => 'escrita'], 500);
+        }
+
+        $base = (em_https() ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? '');
+        $dir  = rtrim(strtr(dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/')), DIRECTORY_SEPARATOR, '/'), '/');
+
+        json_saida(['ok' => true, 'id' => $id, 'url' => $base . $dir . '/captura.php?t=' . $token]);
+
+        // no break
+
+    case 'captura.revogar':
+        $id       = texto(corpo(), 'id', 24);
+        $capturas = ler_json(caminho('capturas.json'), []);
+
+        foreach ($capturas as $k => $c) {
+            if (($c['id'] ?? '') === $id && ($c['usuario_id'] ?? USUARIO_PADRAO) === usuario_atual()) {
+                $capturas[$k]['revogado_em'] = agora();
+            }
+        }
+
+        json_saida(['ok' => escrever_json(caminho('capturas.json'), $capturas)]);
 
         // no break
 

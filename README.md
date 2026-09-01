@@ -144,6 +144,21 @@ O renderizador **escapa o HTML antes de interpretar o markdown**, então texto d
 nota não tem como virar marcação executável — a mesma garantia de um
 sanitizador, sem a dependência.
 
+## Capturar pelo celular
+
+O app **Notas do iOS não tem API pública** — não dá para ler nem escrever nele,
+e Atalhos não consegue alcançá-lo. O caminho que funciona é o inverso: um Atalho
+**manda** texto para o Megabrain, e ele aparece no botão Compartilhar de
+qualquer app, inclusive de dentro do próprio Notas.
+
+Agenda → **capturar** → *Gerar link de captura*, e siga os cinco passos que
+aparecem. Texto sem título empilha na nota "Caixa de entrada", com o mais novo
+no topo; com título vira nota própria.
+
+O token só escreve: nunca devolve conteúdo, tem teto de 20 KB por captura e 60
+por hora. Se vazar, alguém consegue escrever na sua caixa de entrada — não ler,
+não apagar, não entrar na conta.
+
 ## Uso
 
 | Atalho | O quê |

@@ -810,6 +810,7 @@ document.getElementById('ag-proximo').addEventListener('click', () => Agenda.mov
 document.getElementById('ag-hoje').addEventListener('click', () => Agenda.irParaHoje());
 document.getElementById('ag-rotinas').addEventListener('click', () => Agenda.alternarRotinas());
 document.getElementById('ag-celular').addEventListener('click', () => Agenda.painelCelular(api));
+document.getElementById('ag-captura').addEventListener('click', () => Agenda.painelCaptura(api));
 
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && Agenda.aberto()) Agenda.fechar();
@@ -977,6 +978,13 @@ async function carregarHoje() {
     if (nome) extra.push(nome);
     return { texto: partes.join('  '), detalhe: extra.join(' · '), classe: it.origem };
   }, 'Nada marcado hoje.');
+
+  bloco('Importantes', r.importantes, (n) => ({
+    texto: n.titulo,
+    detalhe: [n.previa, espacoNome(n.espaco_id)].filter(Boolean).join(' · '),
+    classe: 'importante',
+    aoClicar: () => abrir(n.id),
+  }), null);
 
   bloco('Precisa de atenção', r.urgentes, (p) => ({
     texto: p.texto,

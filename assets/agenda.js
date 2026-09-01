@@ -615,3 +615,121 @@ window.Agenda.painelCelular = async function (api) {
 
   cx.appendChild(criar);
 };
+
+/**
+ * Captura pelo iPhone.
+ *
+ * O app Notas do iOS não tem API pública: não dá para ler nem escrever nele.
+ * O caminho que funciona é o inverso — um Atalho MANDA o texto para cá, e ele
+ * aparece no botão Compartilhar de qualquer app, inclusive do próprio Notas.
+ */
+window.Agenda.painelCaptura = async function (api) {
+  const cx = document.getElementById('agenda-rotinas');
+  cx.classList.remove('oculto');
+  cx.textContent = '';
+
+  const h = document.createElement('h3');
+  h.textContent = 'Capturar pelo celular';
+  cx.appendChild(h);
+
+  const p = document.createElement('p');
+  p.className = 'ag-subtitulo';
+  p.textContent = 'Gera um link que recebe texto. Um Atalho no iPhone manda para cá do botão Compartilhar de qualquer app.';
+  cx.appendChild(p);
+
+  const lista = document.createElement('ul');
+  lista.className = 'ag-rotinas';
+  cx.appendChild(lista);
+
+  async function recarregar() {
+    const r = await api('captura.listar');
+    lista.textContent = '';
+
+    (r.capturas || []).forEach((c) => {
+      const li = document.createElement('li');
+
+      const nome = document.createElement('span');
+      nome.className = 'ag-titulo';
+      nome.textContent = c.nome;
+      li.appendChild(nome);
+
+      const det = document.createElement('span');
+      det.className = 'ag-detalhe';
+      det.textContent = c.total ? c.total + ' capturas' : 'nunca usado';
+      li.appendChild(det);
+
+      const x = document.createElement('button');
+      x.className = 'ag-acao';
+      x.textContent = '×';
+      x.title = 'Revogar';
+      x.addEventListener('click', async () => {
+        if (!confirm('Revogar "' + c.nome + '"? O Atalho para de funcionar.')) return;
+        await api('captura.revogar', { id: c.id });
+        await recarregar();
+      });
+      li.appendChild(x);
+
+      lista.appendChild(li);
+    });
+  }
+
+  await recarregar();
+
+  const criar = document.createElement('button');
+  criar.className = 'ag-criar-feed';
+  criar.textContent = 'Gerar link de captura';
+  criar.addEventListener('click', async () => {
+    const r = await api('captura.criar', { nome: 'iPhone' });
+
+    const caixa = document.createElement('div');
+    caixa.className = 'ag-link';
+
+    const campo = document.createElement('input');
+    campo.type = 'text';
+    campo.readOnly = true;
+    campo.value = r.url;
+    campo.addEventListener('focus', () => campo.select());
+
+    const copiar = document.createElement('button');
+    copiar.type = 'button';
+    copiar.textContent = 'copiar';
+    copiar.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(r.url);
+        copiar.textContent = 'copiado';
+      } catch (e) {
+        campo.select();
+        copiar.textContent = 'Ctrl+C';
+      }
+    });
+
+    caixa.append(campo, copiar);
+    cx.appendChild(caixa);
+
+    const passos = document.createElement('ol');
+    passos.className = 'ag-passos';
+    [
+      'No iPhone, abra o app Atalhos e crie um atalho novo.',
+      'Nos ajustes dele, ligue "Mostrar na Folha de Compartilhamento" e aceite Texto.',
+      'Adicione a ação "Obter Conteúdo do URL" e cole o link acima.',
+      'Mude o Método para POST e o Corpo da Requisição para Arquivo, escolhendo a Entrada do Atalho.',
+      'Salve como "Mandar pro Megabrain". Agora, em qualquer app, selecione o texto, toque em Compartilhar e escolha o atalho.',
+    ].forEach((t) => {
+      const li = document.createElement('li');
+      li.textContent = t;
+      passos.appendChild(li);
+    });
+    cx.appendChild(passos);
+
+    const aviso = document.createElement('p');
+    aviso.className = 'ag-subtitulo';
+    aviso.textContent = 'Copie agora: o link não aparece de novo. Ele só escreve na sua caixa de entrada — não lê nada e não dá acesso à conta.';
+    cx.appendChild(aviso);
+
+    criar.remove();
+    campo.focus();
+    await recarregar();
+  });
+
+  cx.appendChild(criar);
+};

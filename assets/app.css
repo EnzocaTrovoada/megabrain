@@ -626,3 +626,10 @@ code { font-family: var(--mono); font-size: .9em; }
   padding: .35rem .9rem; border-top: 1px solid var(--linha);
   font-size: .72rem; color: var(--fraco); text-align: right;
 }
+
+.hoje-bloco li.importante { border-left-color: #f59e0b; }
+.ag-passos {
+  margin: .9rem 0 0; padding-left: 1.3rem;
+  font-size: .8rem; color: var(--fraco); line-height: 1.6;
+}
+.ag-passos li { margin: .3rem 0; }

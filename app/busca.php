@@ -121,6 +121,19 @@ function buscar(array $b, string $q): array
     ];
 }
 
+/** Primeira linha com conteúdo, sem marcação de título nem lista. */
+function primeira_linha(string $texto): string
+{
+    foreach (preg_split('/\R/u', $texto) ?: [] as $l) {
+        $l = trim(preg_replace('/^[#>\-*+\s]+|\[[ xX]\]/u', '', $l) ?? $l);
+        if ($l !== '') {
+            return mb_substr($l, 0, 90);
+        }
+    }
+
+    return '';
+}
+
 /**
  * O resumo do dia: o que orienta ao abrir o app.
  *
@@ -158,6 +171,20 @@ function resumo_de_hoje(array $b, string $hoje): array
         }
     }
 
+    $importantes = [];
+    foreach ($b['anotacoes'] as $n) {
+        if (!empty($n['favorita']) && empty($n['excluida_em'])) {
+            $importantes[] = [
+                'id'        => $n['id'],
+                'titulo'    => ($n['titulo'] ?? '') !== '' ? $n['titulo'] : 'Sem título',
+                'espaco_id' => $n['espaco_id'] ?? null,
+                // Primeira linha com texto: serve de lembrete do que tem dentro
+                // sem precisar abrir a nota.
+                'previa'    => primeira_linha((string) ($n['conteudo'] ?? '')),
+            ];
+        }
+    }
+
     $recentes = array_values(array_filter($b['anotacoes'], static fn ($n) => empty($n['excluida_em'])));
     usort($recentes, static fn ($x, $y) => strcmp((string) ($y['atualizado_em'] ?? ''), (string) ($x['atualizado_em'] ?? '')));
 
@@ -166,7 +193,8 @@ function resumo_de_hoje(array $b, string $hoje): array
         'feriados'  => $doDia['feriados'],
         'itens'     => $doDia['itens'],
         'proximas'  => array_slice($proximas, 0, 5),
-        'urgentes'  => array_slice($urgentes, 0, 6),
+        'urgentes'    => array_slice($urgentes, 0, 6),
+        'importantes' => array_slice($importantes, 0, 8),
         'recentes'  => array_map(
             static fn ($n) => ['id' => $n['id'], 'titulo' => $n['titulo'] ?: 'Sem título', 'espaco_id' => $n['espaco_id'] ?? null],
             array_slice($recentes, 0, 5)
