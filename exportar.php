@@ -101,7 +101,9 @@ switch ($o) {
         // enquanto no Brasil ainda e ontem a noite.
         $dia = (string) ($_GET['data'] ?? '');
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dia)) {
-            $dia = gmdate('Y-m-d');
+            // Padrao no fuso de Sao Paulo, nao em UTC. Uma automacao que roda
+            // as 22h pegaria o dia seguinte se fosse pelo relogio do servidor.
+            $dia = (new DateTimeImmutable('now', new DateTimeZone('America/Sao_Paulo')))->format('Y-m-d');
         }
 
         $r = resumo_de_hoje($b, $dia);
