@@ -45,7 +45,8 @@ $capturas = ler_json(caminho('capturas.json'), []);
 $chave    = hash('sha256', $token);
 $reg      = $capturas[$chave] ?? null;
 
-if (!is_array($reg) || !empty($reg['revogado_em'])) {
+// Token de leitura NAO escreve: cada tipo so serve ao endpoint dele.
+if (!is_array($reg) || !empty($reg['revogado_em']) || ($reg['tipo'] ?? 'captura') !== 'captura') {
     recusar('nao_encontrado', 404);
 }
 

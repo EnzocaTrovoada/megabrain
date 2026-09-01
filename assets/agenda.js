@@ -614,6 +614,72 @@ window.Agenda.painelCelular = async function (api) {
   });
 
   cx.appendChild(criar);
+
+  const ler = document.createElement('button');
+  ler.className = 'ag-criar-feed';
+  ler.style.marginLeft = '.4rem';
+  ler.textContent = 'Gerar link de leitura';
+  ler.title = 'Para o Atalho buscar o resumo e escrever no app Notas';
+  ler.addEventListener('click', async () => {
+    const r = await api('captura.criar', { nome: 'Notas do iPhone', tipo: 'exportar' });
+
+    const caixa = document.createElement('div');
+    caixa.className = 'ag-link';
+
+    const campo = document.createElement('input');
+    campo.type = 'text';
+    campo.readOnly = true;
+    campo.value = r.url;
+    campo.addEventListener('focus', () => campo.select());
+
+    const copiar = document.createElement('button');
+    copiar.type = 'button';
+    copiar.textContent = 'copiar';
+    copiar.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(r.url);
+        copiar.textContent = 'copiado';
+      } catch (e) {
+        campo.select();
+        copiar.textContent = 'Ctrl+C';
+      }
+    });
+
+    caixa.append(campo, copiar);
+    cx.appendChild(caixa);
+
+    const opcoes = document.createElement('p');
+    opcoes.className = 'ag-subtitulo';
+    opcoes.textContent = 'Acrescente ao fim do link: &o=hoje (padrão), &o=pendencias, '
+      + '&o=importantes, ou &o=nota&id=ID para uma nota específica.';
+    cx.appendChild(opcoes);
+
+    const passos = document.createElement('ol');
+    passos.className = 'ag-passos';
+    [
+      'No app Atalhos, crie um atalho novo.',
+      'Ação "Obter Conteúdo do URL" e cole o link acima.',
+      'Ação "Criar Nota" (ou "Acrescentar à Nota") com o resultado do passo anterior.',
+      'Para rodar sozinho todo dia, use a aba Automação e escolha um horário.',
+    ].forEach((t) => {
+      const li = document.createElement('li');
+      li.textContent = t;
+      passos.appendChild(li);
+    });
+    cx.appendChild(passos);
+
+    const aviso = document.createElement('p');
+    aviso.className = 'ag-subtitulo';
+    aviso.textContent = 'É cópia, não sincronização: o que você editar no Notas não volta para cá. '
+      + 'O link só lê — não escreve nada e não dá acesso à conta.';
+    cx.appendChild(aviso);
+
+    ler.remove();
+    campo.focus();
+    await recarregar();
+  });
+
+  cx.appendChild(ler);
 };
 
 /**
@@ -655,7 +721,8 @@ window.Agenda.painelCaptura = async function (api) {
 
       const det = document.createElement('span');
       det.className = 'ag-detalhe';
-      det.textContent = c.total ? c.total + ' capturas' : 'nunca usado';
+      det.textContent = (c.tipo === 'exportar' ? 'leitura' : 'captura')
+        + (c.total ? ' · ' + c.total + ' usos' : ' · nunca usado');
       li.appendChild(det);
 
       const x = document.createElement('button');

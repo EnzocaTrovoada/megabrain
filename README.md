@@ -159,6 +159,29 @@ O token só escreve: nunca devolve conteúdo, tem teto de 20 KB por captura e 60
 por hora. Se vazar, alguém consegue escrever na sua caixa de entrada — não ler,
 não apagar, não entrar na conta.
 
+### Do Megabrain para o app Notas
+
+O caminho de volta funciona, mas por fora: o Atalhos tem ações nativas do Notas
+(*Criar Nota*, *Acrescentar à Nota*). Então quem escreve lá é o Atalho rodando
+no aparelho; aqui só entregamos o texto.
+
+**Gerar link de leitura** no mesmo painel. No Atalho: *Obter Conteúdo do URL* →
+*Criar Nota*. Para rodar sozinho todo dia, use a aba Automação.
+
+O que sai depende do sufixo no link:
+
+| Sufixo | Devolve |
+|---|---|
+| `&o=hoje` (padrão) | resumo do dia: agenda, urgentes, provas que vêm |
+| `&o=pendencias` | todas as pendências, urgente primeiro |
+| `&o=importantes` | as notas marcadas com estrela, na íntegra |
+| `&o=nota&id=ID` | uma nota específica |
+
+**É cópia, não sincronização.** O que você editar no Notas não volta.
+
+Os dois tokens moram no mesmo arquivo mas não se misturam: o de captura nunca
+lê, o de leitura nunca escreve. Cada endpoint recusa o tipo que não é o dele.
+
 ## Uso
 
 | Atalho | O quê |

@@ -560,6 +560,7 @@ switch ($acao) {
             $lista[] = [
                 'id'     => $c['id'] ?? '',
                 'nome'   => $c['nome'] ?? '',
+                'tipo'   => $c['tipo'] ?? 'captura',
                 'total'  => (int) ($c['total'] ?? 0),
                 'ultimo' => $c['ultimo'] ?? null,
             ];
@@ -578,6 +579,9 @@ switch ($acao) {
         $capturas[hash('sha256', $token)] = [
             'id'         => $id,
             'usuario_id' => usuario_atual(),
+            // Um so arquivo para os dois tipos, mas cada endpoint so aceita o
+            // seu: token de captura nunca le, token de leitura nunca escreve.
+            'tipo'       => ($d['tipo'] ?? '') === 'exportar' ? 'exportar' : 'captura',
             'nome'       => texto($d, 'nome', 60) ?: 'iPhone',
             'espaco_id'  => texto($d, 'espaco_id', 24) ?: null,
             'criado_em'  => agora(),
@@ -592,7 +596,9 @@ switch ($acao) {
         $base = (em_https() ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? '');
         $dir  = rtrim(strtr(dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/')), DIRECTORY_SEPARATOR, '/'), '/');
 
-        json_saida(['ok' => true, 'id' => $id, 'url' => $base . $dir . '/captura.php?t=' . $token]);
+        $arquivo = ($d['tipo'] ?? '') === 'exportar' ? '/exportar.php?t=' : '/captura.php?t=';
+
+        json_saida(['ok' => true, 'id' => $id, 'url' => $base . $dir . $arquivo . $token]);
 
         // no break
 
@@ -787,6 +793,7 @@ switch ($acao) {
                 'titulo'        => $titulo,
                 'conteudo'      => $conteudo,
                 'espaco_id'     => $espaco,
+                'favorita'      => !empty($d['favorita']),
                 'criado_em'     => agora(),
                 'atualizado_em' => agora(),
                 'excluida_em'   => null,
