@@ -1124,3 +1124,12 @@ function atualizarContador() {
 }
 
 el.editor.addEventListener('input', atualizarContador);
+
+// ------------------------------------------------------------- conta
+
+Conta.iniciar({ api: api });
+document.getElementById('abrir-conta').addEventListener('click', () => Conta.abrir());
+
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && Conta.aberta()) document.getElementById('conta').classList.add('oculto');
+});

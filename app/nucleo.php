@@ -11,6 +11,8 @@ declare(strict_types=1);
 const ARQUIVO_CODIGO_SETUP = 'CODIGO-DE-INSTALACAO.txt';
 const USUARIO_PADRAO       = 'principal';
 
+require_once __DIR__ . '/usuarios.php';
+
 // A Hostinger vem com display_errors ligado. Stack trace na tela vaza caminho
 // absoluto do servidor e trecho de código: erro vai pro log, nunca pro navegador.
 if (PHP_SAPI !== 'cli') {
@@ -213,7 +215,7 @@ function config(): ?array
 
 function instalado(): bool
 {
-    return config() !== null;
+    return config() !== null || is_file(caminho('usuarios.json'));
 }
 
 function instalar(string $codigo, string $senha): string|true
@@ -230,9 +232,18 @@ function instalar(string $codigo, string $senha): string|true
         return 'A senha precisa ter pelo menos 10 caracteres.';
     }
 
-    $ok = escrever_json(caminho('config.json'), [
-        'senha_hash' => password_hash($senha, PASSWORD_DEFAULT),
-        'criado_em'  => gmdate('c'),
+    // O primeiro usuario e o dono: e quem pode convidar.
+    $ok = escrever_json(caminho('usuarios.json'), [
+        USUARIO_PADRAO => [
+            'id'          => USUARIO_PADRAO,
+            'apelido'     => USUARIO_PADRAO,
+            'nome'        => 'Dono',
+            'senha_hash'  => password_hash($senha, PASSWORD_DEFAULT),
+            'papel'       => PAPEL_DONO,
+            'quota_bytes' => QUOTA_DONO,
+            'ativo'       => true,
+            'criado_em'   => gmdate('c'),
+        ],
     ]);
 
     if ($ok) {
@@ -304,7 +315,7 @@ function sessao_atual(): ?array
     return $cache = $s;
 }
 
-function criar_sessao(): void
+function criar_sessao(string $usuarioId = USUARIO_PADRAO): void
 {
     $token = bin2hex(random_bytes(32));
     $todas = sessoes();
@@ -316,7 +327,7 @@ function criar_sessao(): void
     }
 
     $todas[hash('sha256', $token)] = [
-        'usuario_id' => USUARIO_PADRAO,
+        'usuario_id' => $usuarioId,
         'expira'   => time() + SESSAO_DIAS * 86400,
         'absoluto' => time() + 90 * 86400,
         'csrf'     => bin2hex(random_bytes(16)),
@@ -487,7 +498,9 @@ function agora(): string
 const IMAGEM_LADO_MAX  = 1600;   // px no maior lado
 const MINIATURA_LADO   = 360;
 const ARQUIVO_BYTES_MAX = 12582912;  // 12 MB por arquivo, antes de reprocessar
-const QUOTA_BYTES      = 524288000;  // 500 MB no total
+// A quota agora e por usuario, em usuarios.json. Este valor so serve de
+// piso para instalacao que ainda nao migrou.
+const QUOTA_BYTES      = 524288000;
 
 /** Aceita só o que dá pra reencodar. Reencodar é a defesa; sem ela, não entra. */
 const MIMES_ACEITOS = [

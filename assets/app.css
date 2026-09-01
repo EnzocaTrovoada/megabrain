@@ -633,3 +633,45 @@ code { font-family: var(--mono); font-size: .9em; }
   font-size: .8rem; color: var(--fraco); line-height: 1.6;
 }
 .ag-passos li { margin: .3rem 0; }
+
+.cartao .dica a { color: var(--acento); text-decoration: none; }
+.cartao .dica a:hover { text-decoration: underline; }
+
+/* -------------------------------------------------------------- conta */
+
+.sair { display: flex; align-items: center; gap: .1rem; }
+.sair form { margin: 0; }
+
+.conta-caixa { max-height: 82vh; }
+.conta-topo {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .8rem 1.1rem; border-bottom: 1px solid var(--linha);
+}
+.conta-topo strong { font: 600 1rem var(--serif); }
+#fechar-conta {
+  background: none; border: 0; color: var(--fraco);
+  font-size: 1.3rem; line-height: 1; cursor: pointer;
+}
+.conta-corpo { overflow-y: auto; padding: 1.1rem; color: var(--fraco); font-size: .85rem; }
+
+.conta-bloco { margin-bottom: 1.6rem; }
+.conta-bloco h3 {
+  margin: 0 0 .6rem; font-size: .72rem; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--fraco);
+}
+.conta-eu { margin: 0 0 .6rem; color: var(--texto); font-size: .95rem; }
+
+.conta-uso {
+  height: 6px; background: #0b0b0e; border-radius: 999px;
+  overflow: hidden; margin-bottom: .4rem;
+}
+.conta-uso span { display: block; height: 100%; background: var(--acento); }
+.conta-uso span.cheio { background: var(--erro); }
+
+.conta-bloco label { display: block; margin-bottom: .5rem; color: var(--fraco); font-size: .8rem; }
+.conta-bloco label input {
+  display: block; width: 100%; margin-top: .2rem;
+  background: #0b0b0e; border: 1px solid var(--linha); border-radius: 7px;
+  padding: .45rem .6rem; color: var(--texto); outline: none;
+}
+.conta-bloco label input:focus { border-color: var(--acento); }

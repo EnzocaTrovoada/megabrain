@@ -22,6 +22,7 @@ $mutacoes = [
     'pendencia.marcar',
     'nota.favoritar', 'nota.duplicar',
     'captura.criar', 'captura.revogar',
+    'conta.senha', 'convite.criar', 'convite.revogar', 'usuario.desativar',
 ];
 if (in_array($acao, $mutacoes, true)) {
     $enviado = $_SERVER['HTTP_X_CSRF'] ?? '';
@@ -117,7 +118,7 @@ switch ($acao) {
         if (($env['size'] ?? 0) > ARQUIVO_BYTES_MAX) {
             json_saida(['erro' => 'grande_demais', 'limite' => ARQUIVO_BYTES_MAX], 413);
         }
-        if (bytes_usados() > QUOTA_BYTES) {
+        if (bytes_usados() > quota_do_usuario()) {
             json_saida(['erro' => 'quota_cheia'], 507);
         }
 
@@ -616,6 +617,115 @@ switch ($acao) {
 
         // no break
 
+    case 'conta':
+        $u = usuario_por_id(usuario_atual());
+
+        json_saida([
+            'apelido'   => $u['apelido'] ?? '',
+            'nome'      => $u['nome'] ?? '',
+            'papel'     => $u['papel'] ?? PAPEL_MEMBRO,
+            'dono'      => eh_dono(),
+            'usado'     => bytes_usados(),
+            'quota'     => quota_do_usuario(),
+            'espacos'   => count($b['espacos']),
+            'anotacoes' => count(array_filter($b['anotacoes'], static fn ($n) => empty($n['excluida_em']))),
+        ]);
+
+        // no break
+
+    case 'conta.senha':
+        $d = corpo();
+        $r = trocar_senha(usuario_atual(), (string) ($d['atual'] ?? ''), (string) ($d['nova'] ?? ''));
+
+        if ($r !== true) {
+            json_saida($r, 422);
+        }
+        json_saida(['ok' => true]);
+
+        // no break
+
+    case 'convite.criar':
+        if (!eh_dono()) {
+            json_saida(['erro' => 'so_dono'], 403);
+        }
+
+        json_saida(['ok' => true, 'codigo' => criar_convite(usuario_atual(), texto(corpo(), 'nota', 60))]);
+
+        // no break
+
+    case 'convite.listar':
+        if (!eh_dono()) {
+            json_saida(['erro' => 'so_dono'], 403);
+        }
+
+        $us    = usuarios();
+        $lista = [];
+        foreach (convites() as $c) {
+            $lista[] = [
+                'id'        => $c['id'] ?? '',
+                'nota'      => $c['nota'] ?? '',
+                'criado_em' => $c['criado_em'] ?? null,
+                'expira_em' => $c['expira_em'] ?? null,
+                'vencido'   => strtotime((string) ($c['expira_em'] ?? '')) < time(),
+                // O codigo em claro nunca volta: no disco so existe o hash.
+                'usado_por' => $c['usado_por'] ? ($us[$c['usado_por']]['apelido'] ?? '?') : null,
+            ];
+        }
+
+        json_saida(['convites' => $lista, 'usuarios' => array_values(array_map(
+            static fn ($u) => [
+                'id'      => $u['id'],
+                'apelido' => $u['apelido'],
+                'nome'    => $u['nome'] ?? '',
+                'papel'   => $u['papel'] ?? PAPEL_MEMBRO,
+                'ativo'   => !empty($u['ativo']),
+            ],
+            usuarios()
+        ))]);
+
+        // no break
+
+    case 'convite.revogar':
+        if (!eh_dono()) {
+            json_saida(['erro' => 'so_dono'], 403);
+        }
+
+        $id    = texto(corpo(), 'id', 24);
+        $lista = convites();
+        foreach ($lista as $k => $c) {
+            // So convite nao usado: apagar um ja consumido nao desfaz a conta
+            // e ainda perderia o registro de quem entrou por ele.
+            if (($c['id'] ?? '') === $id && empty($c['usado_por'])) {
+                unset($lista[$k]);
+            }
+        }
+
+        json_saida(['ok' => escrever_json(caminho('convites.json'), $lista)]);
+
+        // no break
+
+    case 'usuario.desativar':
+        if (!eh_dono()) {
+            json_saida(['erro' => 'so_dono'], 403);
+        }
+
+        $id = texto(corpo(), 'id', 24);
+        if ($id === usuario_atual()) {
+            json_saida(['erro' => 'nao_pode_a_si'], 422);
+        }
+
+        $us = usuarios();
+        if (!isset($us[$id])) {
+            json_saida(['erro' => 'nao_encontrado'], 404);
+        }
+
+        // Desativa em vez de apagar: os dados da pessoa continuam no disco, e
+        // apagar pasta de anotacao de alguem nao pode ser um clique.
+        $us[$id]['ativo'] = false;
+        json_saida(['ok' => salvar_usuarios($us)]);
+
+        // no break
+
     case 'grafo':
         $vivas = array_values(array_filter(
             $b['anotacoes'],
@@ -808,10 +918,18 @@ switch ($acao) {
         $id = texto(corpo(), 'id', 24);
 
         // Exclusão lógica: dá pra recuperar direto no JSON se você se arrepender.
+        $achou = false;
         foreach ($b['anotacoes'] as $i => $n) {
             if (($n['id'] ?? '') === $id) {
                 $b['anotacoes'][$i]['excluida_em'] = agora();
+                $achou = true;
             }
+        }
+
+        // Responder "ok" sem ter feito nada esconde erro: o id pode ser de
+        // outro usuário, ou simplesmente não existir mais.
+        if (!$achou) {
+            json_saida(['erro' => 'nao_encontrada'], 404);
         }
 
         json_saida(['ok' => salvar_base($b)]);

@@ -33,7 +33,10 @@ testes/ e bin/          testes do cálculo — bloqueados por .htaccess
   config.json           hash da senha
   sessoes.json          sessões ativas
   tentativas.json       controle de força bruta
+  usuarios.json         quem existe, papel e quota
+  convites.json         convites gerados (só o hash do código)
   feeds.json            feeds iCal (global: ical.php responde sem sessão)
+  capturas.json         tokens de captura e leitura do celular
   usuarios/
     principal/          tudo que pertence a UMA pessoa
       base.json         espaços, anotações, rotinas, compromissos
@@ -70,6 +73,33 @@ quem tem acesso aos arquivos do servidor consegue lê-lo — o mesmo nível de
 acesso de quem deveria poder instalar.
 
 Instalou, o arquivo se apaga sozinho e a tela de instalação some para sempre.
+
+## Usuários
+
+Quem instala vira **dono**. Só ele cria convites; quem entra por convite é
+**membro**. Não existe cadastro aberto — sem isso não precisa de captcha, e-mail
+transacional nem política antiabuso, três coisas que sozinhas custariam mais que
+o resto do sistema.
+
+| | Dono | Membro |
+|---|---|---|
+| Espaço em imagens | 500 MB | 200 MB |
+| Criar convite | sim | não |
+| Ver e desativar pessoas | sim | não |
+
+Cada pessoa tem **sua própria pasta** em `dados/usuarios/{id}/`. Ninguém vê nota,
+agenda ou imagem de ninguém — a separação é de arquivo, não de filtro em consulta.
+
+O **id não é o apelido de login**: o id vira nome de pasta, e apelido é coisa que
+se troca. Se fossem a mesma coisa, renomear o login moveria a pasta com todas as
+anotações dentro.
+
+Com um usuário só, o campo de apelido nem aparece no login — o sistema nasceu com
+uma senha só e não faz sentido obrigar a lembrar de um login que nunca foi
+escolhido. A partir do segundo, ele passa a ser exigido.
+
+Desativar não apaga: a pessoa perde o acesso e os dados dela ficam no servidor.
+Apagar anotação de alguém não pode ser um clique.
 
 ## Segurança
 

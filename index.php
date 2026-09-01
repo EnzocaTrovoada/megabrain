@@ -9,6 +9,11 @@ cabecalhos_seguranca();
 $erro = null;
 $modo = !instalado() ? 'instalar' : (autenticado() ? 'app' : 'entrar');
 
+// Chegou por link de convite: vai direto para o cadastro.
+if ($modo === 'entrar' && isset($_GET['convite'])) {
+    $modo = 'registrar';
+}
+
 // Gera o código já na primeira visita, para ele existir no disco quando a
 // pessoa for procurá-lo. Chamar de novo é inofensivo: só relê o arquivo.
 if ($modo === 'instalar') {
@@ -33,17 +38,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $espera = tentativas_bloqueado();
         if ($espera > 0) {
             $erro = "Tentativas demais. Espere {$espera} minutos.";
-        } elseif (password_verify((string) ($_POST['senha'] ?? ''), (string) config()['senha_hash'])) {
-            limpar_tentativas();
-            criar_sessao();
-            header('Location: ./');
-            exit;
         } else {
+            $uid = autenticar((string) ($_POST['apelido'] ?? ''), (string) ($_POST['senha'] ?? ''));
+            if ($uid !== null) {
+                limpar_tentativas();
+                criar_sessao($uid);
+                header('Location: ./');
+                exit;
+            }
             registrar_tentativa();
             usleep(500000);
-            $erro = 'Senha incorreta.';
+            // Mensagem unica: dizer "usuario nao existe" entregaria quais
+            // apelidos estao cadastrados para quem estiver tentando adivinhar.
+            $erro = 'Usuário ou senha incorretos.';
         }
         $modo = 'entrar';
+    } elseif ($acao === 'registrar' && instalado()) {
+        $r = usar_convite(
+            (string) ($_POST['convite'] ?? ''),
+            (string) ($_POST['apelido'] ?? ''),
+            (string) ($_POST['nome'] ?? ''),
+            (string) ($_POST['senha'] ?? '')
+        );
+
+        if (is_string($r)) {
+            criar_sessao($r);
+            header('Location: ./');
+            exit;
+        }
+
+        $erro = $r['erro'];
+        $modo = 'registrar';
     } elseif ($acao === 'sair') {
         destruir_sessao();
         header('Location: ./');
@@ -53,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Sobe a cada mudança em CSS/JS: o LiteSpeed cacheia estático por dias e sem
 // isto você continuaria vendo a versão velha depois do upload.
-$versao = '13';
+$versao = '15';
 
 // Ícone do site. Procura o PNG nos dois lugares onde ele costuma ser largado e
 // cai no SVG do repositório se não achar nenhum — assim reenviar o index.php
@@ -124,10 +149,54 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
 
       <input type="hidden" name="acao" value="entrar">
 
+<?php if (quantos_usuarios() > 1): ?>
+      <label for="apelido">Usuário</label>
+      <input id="apelido" name="apelido" autocomplete="username" required autofocus>
+<?php endif; ?>
+
       <label for="senha">Senha</label>
-      <input id="senha" name="senha" type="password" autocomplete="current-password" required autofocus>
+      <input id="senha" name="senha" type="password" autocomplete="current-password" required
+             <?= quantos_usuarios() > 1 ? '' : 'autofocus' ?>>
 
       <button type="submit">Entrar</button>
+
+      <p class="dica">
+        Tem um convite? <a href="?convite=">Criar conta</a>.
+      </p>
+    </form>
+  </main>
+
+<?php elseif ($modo === 'registrar'): ?>
+
+  <main class="portao">
+    <form method="post" class="cartao">
+      <h1>Criar conta</h1>
+      <p class="sub">Só com convite. Peça um a quem já usa.</p>
+
+      <?php if ($erro !== null): ?><p class="erro"><?= e($erro) ?></p><?php endif; ?>
+
+      <input type="hidden" name="acao" value="registrar">
+
+      <label for="convite">Código do convite</label>
+      <input id="convite" name="convite" autocomplete="off" required
+             value="<?= e((string) ($_GET['convite'] ?? '')) ?>"
+             <?= ($_GET['convite'] ?? '') === '' ? 'autofocus' : '' ?>>
+
+      <label for="nome">Seu nome</label>
+      <input id="nome" name="nome" autocomplete="name" maxlength="60">
+
+      <label for="apelido">Usuário</label>
+      <input id="apelido" name="apelido" autocomplete="username" required
+             pattern="[a-z0-9_-]{3,24}" <?= ($_GET['convite'] ?? '') !== '' ? 'autofocus' : '' ?>>
+      <p class="dica">Minúsculas, números, hífen ou sublinhado. De 3 a 24 caracteres.</p>
+
+      <label for="senha">Senha</label>
+      <input id="senha" name="senha" type="password" autocomplete="new-password" required minlength="10">
+      <p class="dica">Mínimo 10 caracteres. Não dá pra recuperar — anote no seu gerenciador de senhas.</p>
+
+      <button type="submit">Criar conta</button>
+
+      <p class="dica"><a href="./">Já tenho conta</a></p>
     </form>
   </main>
 
@@ -137,7 +206,7 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
     <aside class="lateral" id="lateral">
       <div class="lateral-topo">
         <strong>Megabrain</strong>
-        <form method="post" class="sair"><input type="hidden" name="acao" value="sair"><button type="submit" title="Sair">sair</button></form>
+        <div class="sair"><button type="button" id="abrir-conta" title="Sua conta">conta</button><form method="post"><input type="hidden" name="acao" value="sair"><button type="submit" title="Sair">sair</button></form></div>
       </div>
 
       <input type="search" id="busca" placeholder="Buscar…" autocomplete="off">
@@ -191,6 +260,16 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
     </main>
   </div>
 
+  <div id="conta" class="paleta oculto">
+    <div class="paleta-caixa conta-caixa">
+      <header class="conta-topo">
+        <strong>Conta</strong>
+        <button id="fechar-conta" title="Fechar">×</button>
+      </header>
+      <div id="conta-corpo" class="conta-corpo"></div>
+    </div>
+  </div>
+
   <div id="paleta" class="paleta oculto">
     <div class="paleta-caixa">
       <input id="paleta-campo" type="text" placeholder="Buscar em tudo…" autocomplete="off" spellcheck="false">
@@ -241,6 +320,7 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
   <script type="application/json" id="bootstrap"><?= json_encode(['csrf' => csrf()], JSON_UNESCAPED_UNICODE) ?></script>
   <script src="assets/markdown.js?v=<?= e($versao) ?>"></script>
   <script src="assets/paleta.js?v=<?= e($versao) ?>"></script>
+  <script src="assets/conta.js?v=<?= e($versao) ?>"></script>
   <script src="assets/agenda.js?v=<?= e($versao) ?>"></script>
   <script src="assets/grafo.js?v=<?= e($versao) ?>"></script>
   <script src="assets/app.js?v=<?= e($versao) ?>"></script>
