@@ -235,5 +235,14 @@ function trocar_senha(string $id, string $atual, string $nova): true|array
 
     $us[$id]['senha_hash'] = password_hash($nova, PASSWORD_DEFAULT);
 
-    return salvar_usuarios($us) ? true : ['erro' => 'Não consegui gravar.'];
+    if (!salvar_usuarios($us)) {
+        return ['erro' => 'Não consegui gravar.'];
+    }
+
+    // Derruba as outras sessões e recria a desta aba: se a senha foi trocada
+    // por suspeita, deixar sessão antiga viva anularia a troca.
+    derrubar_sessoes($id);
+    criar_sessao($id);
+
+    return true;
 }

@@ -101,6 +101,31 @@ escolhido. A partir do segundo, ele passa a ser exigido.
 Desativar não apaga: a pessoa perde o acesso e os dados dela ficam no servidor.
 Apagar anotação de alguém não pode ser um clique.
 
+### Esqueci a senha
+
+**Não há envio de e-mail, de propósito.** SMTP em hospedagem compartilhada é a
+peça que mais falha em silêncio — credencial errada, porta bloqueada, mensagem
+em spam — e numa instalação de meia dúzia de pessoas é muita máquina para pouco
+caso de uso. São dois caminhos, nenhum dependendo de rede externa:
+
+**Membro esqueceu:** pede ao dono. No painel *conta → Pessoas*, o botão `⚿` gera
+um link de troca de senha, válido por 30 minutos e uma vez só. O dono manda por
+onde quiser.
+
+**Dono esqueceu:** na tela de login, *Esqueci a senha* → *Gerar código no
+servidor*. O código é gravado em `dados/RECUPERAR-SENHA.txt`, que só quem alcança
+os arquivos do servidor consegue ler — o mesmo acesso de quem já poderia trocar a
+senha na mão. Depois de usado, o arquivo se apaga sozinho.
+
+Em qualquer troca de senha, **todas as sessões daquela pessoa caem**. Se a senha
+foi trocada por suspeita, deixar a sessão antiga viva anularia a troca.
+
+Cinco pedidos por hora por IP. Um dono não troca a senha de outro dono pelo
+painel — isso seria tomar a conta de um igual sem ele saber.
+
+A máquina de token é a mesma que um envio por e-mail usaria: trocar a entrega
+depois não mexe em nada do resto.
+
 ## Segurança
 
 - Senha com `password_hash` (Argon2id/bcrypt conforme o servidor).

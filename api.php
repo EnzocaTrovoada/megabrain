@@ -22,7 +22,7 @@ $mutacoes = [
     'pendencia.marcar',
     'nota.favoritar', 'nota.duplicar',
     'captura.criar', 'captura.revogar',
-    'conta.senha', 'convite.criar', 'convite.revogar', 'usuario.desativar',
+    'conta.senha', 'convite.criar', 'convite.revogar', 'usuario.desativar', 'usuario.recuperar',
 ];
 if (in_array($acao, $mutacoes, true)) {
     $enviado = $_SERVER['HTTP_X_CSRF'] ?? '';
@@ -723,6 +723,37 @@ switch ($acao) {
         // apagar pasta de anotacao de alguem nao pode ser um clique.
         $us[$id]['ativo'] = false;
         json_saida(['ok' => salvar_usuarios($us)]);
+
+        // no break
+
+    case 'usuario.recuperar':
+        if (!eh_dono()) {
+            json_saida(['erro' => 'so_dono'], 403);
+        }
+
+        $id = texto(corpo(), 'id', 24);
+        $u  = usuario_por_id($id);
+
+        if ($u === null || empty($u['ativo'])) {
+            json_saida(['erro' => 'nao_encontrado'], 404);
+        }
+        if (($u['papel'] ?? '') === PAPEL_DONO && $id !== usuario_atual()) {
+            // Um dono nao troca a senha de outro dono pelo painel: isso seria
+            // tomar a conta de um igual sem ele saber.
+            json_saida(['erro' => 'nao_pode_outro_dono'], 403);
+        }
+
+        $codigo = criar_recuperacao($id, 'dono:' . usuario_atual());
+
+        $base = (em_https() ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? '');
+        $dir  = rtrim(strtr(dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/')), DIRECTORY_SEPARATOR, '/'), '/');
+
+        json_saida([
+            'ok'      => true,
+            'codigo'  => $codigo,
+            'url'     => $base . $dir . '/?recuperar=' . $codigo,
+            'minutos' => RECUPERACAO_MINUTOS,
+        ]);
 
         // no break
 

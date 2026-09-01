@@ -13,6 +13,14 @@ $modo = !instalado() ? 'instalar' : (autenticado() ? 'app' : 'entrar');
 if ($modo === 'entrar' && isset($_GET['convite'])) {
     $modo = 'registrar';
 }
+if ($modo === 'entrar' && isset($_GET['recuperar'])) {
+    $modo = 'recuperar';
+}
+if ($modo === 'entrar' && isset($_GET['esqueci'])) {
+    $modo = 'esqueci';
+}
+
+$avisoOk = null;
 
 // Gera o código já na primeira visita, para ele existir no disco quando a
 // pessoa for procurá-lo. Chamar de novo é inofensivo: só relê o arquivo.
@@ -69,6 +77,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $erro = $r['erro'];
         $modo = 'registrar';
+    } elseif ($acao === 'pedir-recuperacao' && instalado()) {
+        $r = pedir_recuperacao_do_dono();
+        if ($r === true) {
+            $avisoOk = 'Pronto. O código está no arquivo dados/'
+                . ARQUIVO_RECUPERACAO . ' no servidor. Vale ' . RECUPERACAO_MINUTOS . ' minutos.';
+            $modo = 'recuperar';
+        } else {
+            $erro = $r['erro'];
+            $modo = 'esqueci';
+        }
+    } elseif ($acao === 'recuperar' && instalado()) {
+        $r = usar_recuperacao((string) ($_POST['codigo'] ?? ''), (string) ($_POST['senha'] ?? ''));
+
+        if (is_string($r)) {
+            criar_sessao($r);
+            header('Location: ./');
+            exit;
+        }
+
+        $erro = $r['erro'];
+        $modo = 'recuperar';
     } elseif ($acao === 'sair') {
         destruir_sessao();
         header('Location: ./');
@@ -78,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Sobe a cada mudança em CSS/JS: o LiteSpeed cacheia estático por dias e sem
 // isto você continuaria vendo a versão velha depois do upload.
-$versao = '15';
+$versao = '16';
 
 // Ícone do site. Procura o PNG nos dois lugares onde ele costuma ser largado e
 // cai no SVG do repositório se não achar nenhum — assim reenviar o index.php
@@ -161,8 +190,63 @@ foreach (['assets/Sprite-0001.png', 'Sprite-0001.png'] as $candidato) {
       <button type="submit">Entrar</button>
 
       <p class="dica">
-        Tem um convite? <a href="?convite=">Criar conta</a>.
+        <a href="?esqueci=1">Esqueci a senha</a>
+        · Tem um convite? <a href="?convite=">Criar conta</a>.
       </p>
+    </form>
+  </main>
+
+<?php elseif ($modo === 'esqueci'): ?>
+
+  <main class="portao">
+    <form method="post" class="cartao">
+      <h1>Esqueci a senha</h1>
+
+      <?php if ($erro !== null): ?><p class="erro"><?= e($erro) ?></p><?php endif; ?>
+
+      <p class="sub">Não há envio de e-mail aqui, de propósito — e-mail em
+      hospedagem compartilhada falha calado. São dois caminhos:</p>
+
+      <p class="dica"><strong>Se você é membro:</strong> peça ao dono. Ele gera
+      um link de troca de senha no painel dele e te manda.</p>
+
+      <p class="dica"><strong>Se você é o dono:</strong> o botão abaixo grava um
+      código dentro da pasta <code>dados/</code> no servidor. Abra pelo
+      Gerenciador de Arquivos da Hostinger. Só quem alcança os arquivos do
+      servidor consegue ler — que é o mesmo acesso de quem já poderia trocar a
+      senha na mão.</p>
+
+      <input type="hidden" name="acao" value="pedir-recuperacao">
+      <button type="submit">Gerar código no servidor</button>
+
+      <p class="dica">
+        <a href="?recuperar=">Já tenho um código</a> · <a href="./">Voltar</a>
+      </p>
+    </form>
+  </main>
+
+<?php elseif ($modo === 'recuperar'): ?>
+
+  <main class="portao">
+    <form method="post" class="cartao">
+      <h1>Nova senha</h1>
+
+      <?php if ($erro !== null): ?><p class="erro"><?= e($erro) ?></p><?php endif; ?>
+      <?php if ($avisoOk !== null): ?><p class="sub"><?= e($avisoOk) ?></p><?php endif; ?>
+
+      <input type="hidden" name="acao" value="recuperar">
+
+      <label for="codigo">Código de recuperação</label>
+      <input id="codigo" name="codigo" autocomplete="off" required autofocus
+             value="<?= e((string) ($_GET['recuperar'] ?? '')) ?>">
+
+      <label for="senha">Nova senha</label>
+      <input id="senha" name="senha" type="password" autocomplete="new-password" required minlength="10">
+      <p class="dica">Mínimo 10 caracteres. Todas as outras sessões caem.</p>
+
+      <button type="submit">Trocar senha</button>
+
+      <p class="dica"><a href="./">Voltar</a></p>
     </form>
   </main>
 

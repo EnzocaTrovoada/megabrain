@@ -160,6 +160,43 @@ window.Conta = (function () {
         li.appendChild(d);
 
         if (u.papel !== 'dono' && u.ativo) {
+          const k = document.createElement('button');
+          k.className = 'ag-acao';
+          k.textContent = '⚿';
+          k.title = 'Gerar link de troca de senha';
+          k.addEventListener('click', async () => {
+            const r = await api('usuario.recuperar', { id: u.id });
+
+            const caixa = document.createElement('div');
+            caixa.className = 'ag-link';
+
+            const campo = document.createElement('input');
+            campo.type = 'text';
+            campo.readOnly = true;
+            campo.value = r.url;
+            campo.addEventListener('focus', () => campo.select());
+
+            const cp = document.createElement('button');
+            cp.type = 'button';
+            cp.textContent = 'copiar';
+            cp.addEventListener('click', async () => {
+              try {
+                await navigator.clipboard.writeText(r.url);
+                cp.textContent = 'copiado';
+              } catch (e) {
+                campo.select();
+                cp.textContent = 'Ctrl+C';
+              }
+            });
+
+            caixa.append(campo, cp);
+            pessoas.appendChild(caixa);
+            aviso(pessoas, 'Mande para @' + u.apelido + '. Vale ' + r.minutos
+              + ' minutos e uma vez só. Todas as sessões dela caem ao trocar.');
+            campo.focus();
+          });
+          li.appendChild(k);
+
           const x = document.createElement('button');
           x.className = 'ag-acao';
           x.textContent = '×';

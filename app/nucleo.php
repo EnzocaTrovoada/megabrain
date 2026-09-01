@@ -12,6 +12,7 @@ const ARQUIVO_CODIGO_SETUP = 'CODIGO-DE-INSTALACAO.txt';
 const USUARIO_PADRAO       = 'principal';
 
 require_once __DIR__ . '/usuarios.php';
+require_once __DIR__ . '/recuperacao.php';
 
 // A Hostinger vem com display_errors ligado. Stack trace na tela vaza caminho
 // absoluto do servidor e trecho de código: erro vai pro log, nunca pro navegador.
