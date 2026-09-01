@@ -25,6 +25,35 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('X-Robots-Tag: noindex, nofollow');
 
+/**
+ * Desfaz a repetição do mesmo bloco emendado.
+ *
+ * O compartilhamento do iOS entrega o mesmo conteúdo em vários formatos. Um
+ * Atalho que usa a Entrada do Atalho crua manda todos emendados, e o texto
+ * chega repetido N vezes, colado, sem separador nenhum.
+ *
+ * Só colapsa quando a string INTEIRA é o mesmo bloco ladrilhado e o bloco tem
+ * tamanho respeitável — texto escrito por gente não se repete exatamente assim.
+ */
+function colapsar_repeticao(string $t): string
+{
+    $n = strlen($t);
+    if ($n < 40) {
+        return $t;
+    }
+
+    for ($pedaco = 20; $pedaco <= intdiv($n, 2); $pedaco++) {
+        if ($n % $pedaco !== 0) {
+            continue;
+        }
+        if (str_repeat(substr($t, 0, $pedaco), intdiv($n, $pedaco)) === $t) {
+            return substr($t, 0, $pedaco);
+        }
+    }
+
+    return $t;
+}
+
 function recusar(string $erro, int $codigo): never
 {
     http_response_code($codigo);
@@ -80,6 +109,8 @@ if ($texto === '' && $titulo === '') {
     recusar('vazio', 422);
 }
 
+$texto = colapsar_repeticao($texto);
+
 $dono = $reg['usuario_id'] ?? USUARIO_PADRAO;
 $b    = base_de($dono);
 
@@ -99,8 +130,19 @@ if ($titulo !== '') {
         'excluida_em'   => null,
     ];
 } else {
-    $linha = '- ' . str_replace(["\r\n", "\r", "\n"], ' ', $texto)
-        . '  <!-- ' . gmdate('d/m H:i') . ' -->';
+    // Várias linhas viram UM item de lista, com as seguintes indentadas.
+    // Achatar tudo numa linha só destruía a estrutura de qualquer captura maior
+    // que uma frase; indentar mantém o markdown válido e o texto legível.
+    $linhas = preg_split('/\R/u', $texto) ?: [$texto];
+    $linhas = array_values(array_filter(
+        array_map('rtrim', $linhas),
+        static fn ($l) => $l !== ''
+    ));
+
+    $linha = '- ' . array_shift($linhas) . '  <!-- ' . gmdate('d/m H:i') . ' -->';
+    foreach ($linhas as $extra) {
+        $linha .= "\n  " . $extra;
+    }
 
     $achou = false;
     foreach ($b['anotacoes'] as $i => $n) {
